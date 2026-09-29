@@ -307,6 +307,7 @@ window.DB = (function () {
     if (!_loaded) { await init(); }
     await asAdmin(async trx => {
       const tabelas = [
+        'reembolsos',
         'relatorios_diarios',
         'blocked_clients', 'reports', 'superadmin_sessions', 'audit_log', 'tickets', 'gallery_images', 'reviews',
         'notifications', 'magic_tokens', 'sms_codes', 'sessions', 'appointment_services',

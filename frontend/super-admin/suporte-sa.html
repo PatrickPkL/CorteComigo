@@ -58,33 +58,67 @@
     <h1>Suporte</h1>
     <div class="sa-header-extra">
       <div class="sa-count">Tickets abertos: <strong id="sa-total-abertos">0</strong></div>
+    <div class="sa-count">Pedidos em análise: <strong id="sa-total-reembolsos">0</strong></div>
     </div>
   </div>
 
-  <div class="sa-filtros" id="sa-filtros">
-    <button class="sa-filtro-btn active" data-status="todos">Todos</button>
-    <button class="sa-filtro-btn" data-status="aberto">Aberto</button>
-    <button class="sa-filtro-btn" data-status="respondido">Respondido</button>
-    <button class="sa-filtro-btn" data-status="resolvido">Resolvido</button>
+  <div class="sa-filtros" id="sa-abas">
+    <button class="sa-filtro-btn active" data-aba="chamados">Chamados</button>
+    <button class="sa-filtro-btn" data-aba="reembolsos">Reembolsos</button>
   </div>
 
-  <div class="sa-table-wrap">
-    <table class="sa-table">
-      <thead>
-        <tr>
-          <th>Data</th>
-          <th>Loja</th>
-          <th>Cidade</th>
-          <th>Assunto</th>
-          <th>Mensagem</th>
-          <th>Status</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody id="tbody-tickets">
-        <tr><td colspan="7" class="sa-vazio">Carregando...</td></tr>
-      </tbody>
-    </table>
+  <div id="sa-painel-chamados">
+    <div class="sa-filtros" id="sa-filtros">
+      <button class="sa-filtro-btn active" data-status="todos">Todos</button>
+      <button class="sa-filtro-btn" data-status="aberto">Aberto</button>
+      <button class="sa-filtro-btn" data-status="respondido">Respondido</button>
+      <button class="sa-filtro-btn" data-status="resolvido">Resolvido</button>
+    </div>
+
+    <div class="sa-table-wrap">
+      <table class="sa-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Loja</th>
+            <th>Cidade</th>
+            <th>Assunto</th>
+            <th>Mensagem</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-tickets">
+          <tr><td colspan="7" class="sa-vazio">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="sa-painel-reembolsos" hidden>
+    <div class="sa-filtros" id="sa-filtros-reembolso">
+      <button class="sa-filtro-btn active" data-reb="EM_ANALISE">Pedidos de Reembolso</button>
+      <button class="sa-filtro-btn" data-reb="REEMBOLSADO">Reembolsados</button>
+    </div>
+
+    <div class="sa-table-wrap">
+      <table class="sa-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Usuário</th>
+            <th>Loja</th>
+            <th>Dados da conta</th>
+            <th>Relatório / Motivo</th>
+            <th>Chave Pix (EVP)</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-reembolsos">
+          <tr><td colspan="7" class="sa-vazio">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </main>
 

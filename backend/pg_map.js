@@ -439,6 +439,21 @@ const MAP = [
       chave: r.chave, valor: r.valor || {},
       updated_at: toMemDate(r.updated_at, 'iso')
     })
+  },
+  {
+    colecao: 'reembolsos', tabela: 'reembolsos', pk: 'id', dateOut: 'iso',
+    toPg: (r) => ({
+      id: r.id, user_id: r.user_id, barbershop_id: r.barbershop_id || null,
+      temporary_pix_key: r.temporary_pix_key, reason: r.reason,
+      status: r.status || 'PENDENTE_GMAIL', visible_to_admin: tagBool(r.visible_to_admin),
+      created_at: toPgDate(r.created_at) || new Date(), updated_at: toPgDate(r.updated_at) || new Date()
+    }),
+    toMem: (r) => ({
+      id: r.id, user_id: r.user_id, barbershop_id: r.barbershop_id,
+      temporary_pix_key: r.temporary_pix_key, reason: r.reason,
+      status: r.status, visible_to_admin: r.visible_to_admin ? 1 : 0,
+      created_at: toMemDate(r.created_at, 'iso'), updated_at: toMemDate(r.updated_at, 'iso')
+    })
   }
 ];
 
@@ -478,7 +493,8 @@ const CASTS = {
   reports: { reporter_user_id: 'uuid', target_type: 'report_target', target_user_id: 'uuid', target_barbershop_id: 'uuid', target_client_id: 'uuid', status: 'report_status', created_at: 'timestamptz', updated_at: 'timestamptz' },
   blocked_clients: { barbershop_id: 'uuid', client_id: 'uuid', created_at: 'timestamptz' },
   relatorios_diarios: { barbershop_id: 'uuid', data: 'date', faturamento: 'numeric', agendamentos: 'int', ticket: 'numeric', created_at: 'timestamptz' },
-  platform_settings: { valor: 'jsonb', updated_at: 'timestamptz' }
+  platform_settings: { valor: 'jsonb', updated_at: 'timestamptz' },
+  reembolsos: { user_id: 'uuid', barbershop_id: 'uuid', status: 'reimb_status', visible_to_admin: 'boolean', created_at: 'timestamptz', updated_at: 'timestamptz' }
 };
 
 const BY_COLECAO = {};

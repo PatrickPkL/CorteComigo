@@ -4074,7 +4074,276 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return DB._d().reviews.filter(r => r.user_id === user.id);
   }
 
+  /* ================= REEMBOLSOS (CDC art. 49 · 7 dias) =================
+     Ciclo de vida do pedido:
+       PENDENTE_GMAIL → criado no envio do relatório pelo site.
+                        OCULTO na lista do Super Admin (a listagem
+                        filtra status = 'EM_ANALISE', então este
+                        status nunca casa — o default
+                        visible_to_admin = TRUE permanece honesto).
+       EM_ANALISE     → o barbeiro confirmou o envio pelo Gmail
+                        (confirmarEnvioGmail). Vira visível ao
+                        Super Admin.
+       REEMBOLSADO    → o Super Admin marcou "Realizado". Dispara
+                        a notificação de sucesso ao barbeiro.
+     ============================================================ */
+
+  const REEMBOLSO_DIAS = 7;
+  const REEMBOLSO_EMAIL = () =>
+    String(process.env.REEMBOLSO_EMAIL || process.env.GMAIL_USER || 'suporte@cortecomigo.com.br').trim();
+
+  /**
+   * Chave Pix temporária/aleatória (EVP) OBRIGATÓRIA.
+   * CPF é estritamente bloqueado — a checagem vem ANTES da do formato
+   * para que um CPF sempre receba a mensagem específica (e nunca a
+   * genérica de UUID). O regex de 11 dígitos seguidos cobre também o
+   * CPF colado no meio de um texto ou com espaços, que escapariam dos
+   * dois padrões ancorados.
+   */
+  function validarChavePix(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) err(400, 'Informe a chave Pix temporária/aleatória para receber o reembolso.');
+    /* Detecção de CPF: SOMENTE as formas de CPF (11 dígitos, com ou sem
+       máscara/espaços). Não usa \d{11,} porque o último grupo de uma EVP
+       válida tem 12 caracteres hex e pode ser 100% numérico — esse regex
+       rejeitaria chaves Pix legítimas. */
+    const soDigitos = s.replace(/[.\-\s]/g, '');
+    const pareceCpf = /^\d{11}$/.test(s)
+      || /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(s)
+      || (/^[\d.\-\s]+$/.test(s) && soDigitos.length === 11);
+    if (pareceCpf) {
+      err(400, 'Não aceitamos CPF. Por favor, informe uma chave Pix temporária/aleatória.');
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) {
+      err(400, 'Informe uma chave Pix temporária/aleatória (EVP) no formato UUID.');
+    }
+    return s.toLowerCase();
+  }
+
+  /* Predicado único de visibilidade para o Super Admin.
+     `visible_to_admin` chega como boolean (memória/PostgreSQL) ou como
+     0/1 (JSON cru); comparar com `=== 0` deixava passar a linha oculta. */
+  function _reembolsoVisivelAoAdmin(r) {
+    return !(r.visible_to_admin === false || r.visible_to_admin === 0
+      || r.visible_to_admin === '0' || r.visible_to_admin === 'false'
+      || r.visible_to_admin === null || r.visible_to_admin === undefined);
+  }
+
+  /* Data-base do prazo: o pagamento pago e NÃO estornado mais recente.
+     Espelha backend/payments.js (estornarArrependimento), que já
+     aplica os 7 dias do CDC art. 49 sobre `payments.paid_at`.
+     Fallback: subscriptions.created_at (loja ainda sem cobrança). */
+  function basePrazoReembolso(shopId) {
+    const db = DB._d();
+    const pagos = (db.payments || [])
+      .filter(p => p.barbershop_id === shopId && p.status === 'paid' && !p.refunded_at && p.paid_at)
+      .map(p => Date.parse(p.paid_at))
+      .filter(ms => !isNaN(ms))
+      .sort((a, b) => b - a);
+    if (pagos.length) return pagos[0];
+    const sub = (db.subscriptions || []).find(s => s.barbershop_id === shopId);
+    if (sub && sub.created_at) {
+      const ms = Date.parse(sub.created_at);
+      if (!isNaN(ms)) return ms;
+    }
+    return null;
+  }
+
+  /**
+   * Trava de 7 dias — calculada SEMPRE no servidor. A interface apenas
+   * renderiza o resultado: ela não é fronteira de segurança.
+   * Sem data-base (loja que nunca pagou) a resposta é fail-closed
+   * (prazo encerrado), no mesmo espírito do boot de DB_ENCRYPT_KEY.
+   */
+  function prazoReembolso(shopId) {
+    const baseMs = basePrazoReembolso(shopId);
+    if (baseMs == null) {
+      return {
+        dentro_do_prazo: false, dias_restantes: 0, dias_limite: REEMBOLSO_DIAS,
+        base_em: null, limite_em: null, email_contato: REEMBOLSO_EMAIL()
+      };
+    }
+    const limiteMs = baseMs + REEMBOLSO_DIAS * 24 * 60 * 60 * 1000;
+    const restante = limiteMs - Date.now();
+    const diasRestantes = Math.max(0, Math.floor(restante / (24 * 60 * 60 * 1000)));
+    return {
+      dentro_do_prazo: restante >= 0,
+      dias_restantes: diasRestantes,
+      dias_limite: REEMBOLSO_DIAS,
+      base_em: new Date(baseMs).toISOString(),
+      limite_em: new Date(limiteMs).toISOString(),
+      email_contato: REEMBOLSO_EMAIL()
+    };
+  }
+
+  function reembolsoPublico(r) {
+    return {
+      id: r.id, user_id: r.user_id, barbershop_id: r.barbershop_id || null,
+      temporary_pix_key: r.temporary_pix_key, reason: r.reason,
+      status: r.status,
+      created_at: r.created_at, updated_at: r.updated_at
+    };
+  }
+
+  /* Situação da trava + último pedido em aberto (alimenta a tela do
+     barbeiro sem recalcular data no cliente). */
+  function reembolsoDisponivel() {
+    const { user, shop } = exigirDono();
+    const prazo = prazoReembolso(shop.id);
+    const meus = (DB._d().reembolsos || []).filter(r => r.user_id === user.id);
+    const aberto = meus
+      .filter(r => r.status !== 'REEMBOLSADO')
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))[0] || null;
+    return Object.assign({}, prazo, {
+      user_id: user.id,
+      barbershop_id: shop.id,
+      pedido_aberto: aberto ? reembolsoPublico(aberto) : null
+    });
+  }
+
+  function solicitarReembolso(dados) {
+    dados = dados || {};
+    const { user, shop } = exigirDono();
+    /* [SEGURANÇA] A trava de 7 dias é reavaliada AQUI (e não só na
+       interface): o cliente pode chamar a API diretamente. */
+    const prazo = prazoReembolso(shop.id);
+    if (!prazo.dentro_do_prazo) {
+      err(409, 'Tempo excedido para a realização do reembolso. O prazo limite para solicitação é de até 7 dias após a compra.');
+    }
+    const chave = validarChavePix(dados.temporary_pix_key);
+    const motivo = String(dados.reason == null ? '' : dados.reason).trim();
+    if (motivo.length < 10) err(400, 'Descreva o motivo do reembolso com pelo menos 10 caracteres.');
+    if (motivo.length > 2000) err(400, 'O motivo do reembolso deve ter no máximo 2000 caracteres.');
+
+    const db = DB._d();
+    db.reembolsos = db.reembolsos || [];
+    /* Um pedido aberto por vez: evita duplicidade quando o barbeiro
+       clica em "Enviar" duas vezes. O REEMBOLSADO fecha o ciclo e
+       libera um novo pedido. */
+    const jaAberto = db.reembolsos.some(r =>
+      r.user_id === user.id && r.status !== 'REEMBOLSADO' && r.visible_to_admin !== 0);
+    if (jaAberto) err(409, 'Você já tem uma solicitação de reembolso em andamento.');
+
+    const r = {
+      id: DB.proximoId(),
+      user_id: user.id,
+      barbershop_id: shop.id,
+      temporary_pix_key: chave,
+      reason: motivo,
+      status: 'PENDENTE_GMAIL',
+      visible_to_admin: true,
+      created_at: agoraISO(),
+      updated_at: agoraISO()
+    };
+    db.reembolsos.push(r);
+    DB.salvar();
+    return reembolsoPublico(r);
+  }
+
+  /* Isolamento por usuário (o id do cliente NÃO é confiável) — mesmo
+     padrão de ticketsDoSalao. */
+  function meusReembolsos() {
+    const { user } = exigirDono();
+    return (DB._d().reembolsos || [])
+      .filter(r => r.user_id === user.id)
+      .slice()
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .map(reembolsoPublico);
+  }
+
+  /* Confirmação do barbeiro de que o relatório foi enviado pelo Gmail:
+     PENDENTE_GMAIL → EM_ANALISE (passa a ser visível ao Super Admin). */
+  function confirmarEnvioGmail(id) {
+    const { user } = exigirDono();
+    const r = (DB._d().reembolsos || []).find(x => x.id == id && x.user_id === user.id);
+    if (!r) err(404, 'Solicitação de reembolso não encontrada.');
+    if (r.status === 'REEMBOLSADO') {
+      err(409, 'Este reembolso já foi concluído.');
+    }
+    if (r.status === 'PENDENTE_GMAIL') {
+      r.status = 'EM_ANALISE';
+      r.visible_to_admin = true;
+      r.updated_at = agoraISO();
+      DB.salvar();
+    }
+    return reembolsoPublico(r);
+  }
+
+  /* ---------- super-admin: pedidos de reembolso ---------- */
+
+  function saListarReembolsos(filtros) {
+    filtros = filtros || {};
+    const db = _db();
+    let lista = (db.reembolsos || [])
+      .filter(r => _reembolsoVisivelAoAdmin(r))
+      /* PENDENTE_GMAIL NUNCA aparece para o Super Admin: o barbeiro ainda
+         não confirmou o envio do e-mail. A solicitação só entra na fila
+         quando ele clica em "Já enviei o e-mail" (-> EM_ANALISE). */
+      .filter(r => r.status !== 'PENDENTE_GMAIL');
+    if (filtros.status && filtros.status !== 'todos') {
+      lista = lista.filter(r => r.status === filtros.status);
+    }
+    return lista
+      .slice()
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+      .map(r => {
+        const u = (db.users || []).find(x => x.id === r.user_id);
+        const loja = (db.barbershops || []).find(b => b.id === r.barbershop_id);
+        return {
+          id: r.id,
+          status: r.status,
+          usuario_nome: u ? u.name : '—',
+          usuario_email: u ? u.email : '',
+          usuario_telefone: u ? (u.phone || '') : '',
+          loja_nome: loja ? loja.name : '',
+          loja_cidade: loja ? (loja.city || '') : '',
+          temporary_pix_key: r.temporary_pix_key,
+          motivo: r.reason,
+          criadoEm: r.created_at,
+          atualizadoEm: r.updated_at
+        };
+      });
+  }
+
+  function saMarcarReembolsoRealizado(id) {
+    const db = _db();
+    const r = (db.reembolsos || []).find(x => x.id == id);
+    if (!r) err(404, 'Pedido de reembolso não encontrado.');
+    if (!_reembolsoVisivelAoAdmin(r)) err(404, 'Pedido de reembolso não encontrado.');
+    if (r.status === 'REEMBOLSADO') {
+      return { id: r.id, status: r.status, notificacao: false };
+    }
+    r.status = 'REEMBOLSADO';
+    r.updated_at = agoraISO();
+    /* GATILHO DE NOTIFICAÇÃO — avisa o barbeiro que o PIX saiu.
+       notificar() não persiste sozinho: o DB.salvar() abaixo
+       grava o pedido E a notificação no mesmo ciclo. */
+    notificar({
+      user_id: r.user_id,
+      barbershop_id: r.barbershop_id,
+      type: 'reembolso',
+      title: 'Reembolso realizado',
+      message: 'Seu reembolso foi realizado com sucesso! O valor foi transferido para a chave Pix cadastrada.',
+      extra: { reimbursement_id: r.id }
+    });
+    DB.salvar();
+    return { id: r.id, status: r.status, notificacao: true };
+  }
+
+  /* Soft delete de VISUALIZAÇÃO: apenas visible_to_admin = false.
+     É estritamente proibido apagar a linha (DELETE FROM) — o histórico
+     do pedido e a trilha de auditoria precisam ser preservados. */
+  function saOcultarReembolso(id) {
+    const r = (_db().reembolsos || []).find(x => x.id == id);
+    if (!r) err(404, 'Pedido de reembolso não encontrado.');
+    r.visible_to_admin = false;
+    r.updated_at = agoraISO();
+    DB.salvar();
+    return { id: r.id, visible_to_admin: false };
+  }
+
   /* ================= LGPD — Exportação de Dados ================= */
+
 
   function exportarMeusDados() {
     var user = sessao();
@@ -4294,6 +4563,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     // suporte
     criarTicket, ticketsDoSalao,
 
+    // reembolsos (CDC art. 49)
+    reembolsoDisponivel, solicitarReembolso, meusReembolsos, confirmarEnvioGmail,
+
     // magic link / lembretes
     verificarMagicLink, gerarLembretesAmanha,
 
@@ -4305,6 +4577,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     saListarLojas, saListarUsuarios, saDetalheLoja,
     saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
     saTickets, saResponderTicket,
+    saListarReembolsos, saMarcarReembolsoRealizado, saOcultarReembolso,
     saListarDenuncias, saResolverDenuncia,
     saListarPlanos, saAtualizarPrecosPlano, saCriarPlano, saEditarPlano, saExcluirPlano,
     saObterConfig, saDefinirSiteGratis, saDefinirTrial

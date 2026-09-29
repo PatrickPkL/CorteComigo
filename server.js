@@ -202,6 +202,7 @@ const _authRequired = new Set([
   'gerarCodigoExclusao', 'confirmarExclusao',
   'alternarFavorito', 'meusFavoritos',
   'criarTicket', 'ticketsDoSalao',
+  'reembolsoDisponivel', 'solicitarReembolso', 'meusReembolsos', 'confirmarEnvioGmail',
   'definirLogo', 'definirCapa',
   'adicionarGaleria', 'removerGaleria',
   'gerarLembretesAmanha', 'gerarLembretesPendentes',
@@ -228,6 +229,7 @@ const _RPC_BLOQUEADOS = new Set([
   'saListarLojas', 'saListarUsuarios', 'saDetalheLoja',
   'saAtualizarPlano', 'saExcluirLoja', 'saDashboard', 'saRelatorios',
   'saTickets', 'saResponderTicket',
+  'saListarReembolsos', 'saMarcarReembolsoRealizado', 'saOcultarReembolso',
   'saListarDenuncias', 'saResolverDenuncia',
   'saListarPlanos', 'saAtualizarPrecosPlano', 'saCriarPlano', 'saEditarPlano', 'saExcluirPlano',
   'saObterConfig', 'saDefinirSiteGratis', 'saDefinirTrial',
@@ -646,6 +648,36 @@ function handleSuperAdmin(req, res, pathname, url) {
       const r = API.saResponderTicket(idParam, dados);
       json(res, 200, { ok: true, data: r });
     }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* GET /api/super-admin/reembolsos?status=EM_ANALISE|REEMBOLSADO|todos
+     PENDENTE_GMAIL nunca aparece aqui: o filtro de status o mantém
+     oculto enquanto o barbeiro não confirma o envio do e-mail. */
+  if (rota === 'reembolsos' && !idParam && req.method === 'GET') {
+    try {
+      var qsReb = new URL(url, 'http://localhost').searchParams;
+      var rReb = API.saListarReembolsos({ status: qsReb.get('status') || 'todos' });
+      json(res, 200, { ok: true, data: rReb });
+    } catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
+    return;
+  }
+
+  /* PUT /api/super-admin/reembolso/:id — marca como realizado e dispara
+     a notificação de sucesso para o barbeiro */
+  if (rota === 'reembolso' && idParam && parts[2] === undefined && req.method === 'PUT') {
+    return readBody().then(dados => {
+      const r = API.saMarcarReembolsoRealizado(idParam, dados);
+      json(res, 200, { ok: true, data: r });
+    }).catch(e => json(res, (e && e.status) || 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
+  }
+
+  /* DELETE /api/super-admin/reembolso/:id — soft delete de VISUALIZAÇÃO.
+     Despite o verbo HTTP, a linha NÃO é removida: a API só grava
+     visible_to_admin = false (trilha de auditoria preservada). */
+  if (rota === 'reembolso' && idParam && parts[2] === undefined && req.method === 'DELETE') {
+    try { const r = API.saOcultarReembolso(idParam); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, (e && e.status) || 404, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
+    return;
   }
 
   /* GET /api/super-admin/denuncias?status=...&tipo=... */

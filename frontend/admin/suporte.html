@@ -10,20 +10,91 @@
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
 <link rel="stylesheet" href="css/admin.css">
-<style>
-  .suporte-resposta {
-    margin-top: 10px;
-    padding: 10px 12px;
-    background: rgba(184,134,59,.1);
-    border-left: 3px solid #b8863b;
-    border-radius: 6px;
-    color: #f0f0f0;
-    font-size: 13.5px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-</style>
+  <style>
+    .suporte-resposta {
+      margin-top: 10px;
+      padding: 10px 12px;
+      background: rgba(184,134,59,.1);
+      border-left: 3px solid #b8863b;
+      border-radius: 6px;
+      color: #f0f0f0;
+      font-size: 13.5px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    /* Grade da página de suporte: FAQ à esquerda, reembolso à direita.
+       No mobile as duas colunas empilham (breakpoint do base.css). */
+    .suporte-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 900px) {
+      .suporte-grid { grid-template-columns: 1fr; }
+    }
+    .reb-aviso {
+      display: flex;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      font-size: 13.5px;
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+    .reb-aviso-info {
+      background: rgba(184,134,59,.14);
+      border: 1px solid var(--brass-soft);
+      color: var(--text);
+    }
+    .reb-aviso-erro {
+      background: rgba(161,67,60,.14);
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+    .reb-erro-campo {
+      color: var(--danger);
+      font-size: 12.5px;
+      margin-top: 6px;
+      min-height: 16px;
+    }
+    input[aria-invalid="true"] {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(161,67,60,.18);
+    }
+    .reb-chave {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      word-break: break-all;
+    }
+    .reb-envio-acoes {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .reb-status-linha {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .reb-status-linha:last-child { border-bottom: none; }
+    .reb-motivo {
+      color: var(--text-muted);
+      font-size: 13.5px;
+      line-height: 1.55;
+      margin-top: 4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+
 </head>
 <body data-page="suporte">
 <div id="sidebar-overlay" class="sidebar-overlay"></div>
@@ -175,24 +246,115 @@
       </table>
     </div>
 
-    <div class="card" style="margin-top:20px;">
-      <h3 class="section-title">Perguntas frequentes</h3>
-      <details class="faq-item">
-        <summary>Como funcionam os planos e a cobrança?</summary>
-        <p>Você pode trocar de plano a qualquer momento na página Assinatura. A cobrança é mensal e a mudança vale a partir do próximo ciclo.</p>
-      </details>
-      <details class="faq-item">
-        <summary>O cliente cancelou e o horário ficou preso. E agora?</summary>
-        <p>Quando um agendamento é cancelado, o horário volta automaticamente para a agenda do profissional e pode ser marcado novamente.</p>
-      </details>
-      <details class="faq-item">
-        <summary>Consigo recuperar fotos apagadas da galeria?</summary>
-        <p>Não. Ao remover uma foto nas Configurações ela é excluída definitivamente. Recomendamos manter uma cópia no seu dispositivo.</p>
-      </details>
-      <details class="faq-item">
-        <summary>Como adiciono outro responsável ao meu salão?</summary>
-        <p>Você pode adicionar funcionários na aba <strong><a href="/funcionarios">Funcionários</a></strong> (menu Equipe). Lá você cria o login (e-mail) e a senha de cada pessoa com um clique. O funcionário também pode se auto-cadastrar pela opção <strong>Funcionário / Dependente</strong> no <a href="/login"><code>/login</code></a> e vincular à empresa informando o <strong>Código Único</strong> (ele aparece no painel Início). Cada funcionário acessa a <strong>agenda e os clientes</strong> — os relatórios financeiros ficam bloqueados para esse perfil. Use <strong>Desligar</strong> para remover o vínculo ou <strong>Remover</strong> para apagar a conta em definitivo.</p>
-      </details>
+    <!-- Grade 2 colunas: FAQ (esquerda) · Solicitação de Reembolso (direita).
+         O conteúdo de cada lado é controlado por js/suporte.js conforme
+         a trava de 7 dias devolvida pelo servidor. -->
+    <div class="suporte-grid">
+
+      <div class="card">
+        <h3 class="section-title">Perguntas frequentes</h3>
+        <details class="faq-item">
+          <summary>Como funcionam os planos e a cobrança?</summary>
+          <p>Você pode trocar de plano a qualquer momento na página Assinatura. A cobrança é mensal e a mudança vale a partir do próximo ciclo.</p>
+        </details>
+        <details class="faq-item">
+          <summary>O cliente cancelou e o horário ficou preso. E agora?</summary>
+          <p>Quando um agendamento é cancelado, o horário volta automaticamente para a agenda do profissional e pode ser marcado novamente.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Consigo recuperar fotos apagadas da galeria?</summary>
+          <p>Não. Ao remover uma foto nas Configurações ela é excluída definitivamente. Recomendamos manter uma cópia no seu dispositivo.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Como adiciono outro responsável ao meu salão?</summary>
+          <p>Você pode adicionar funcionários na aba <strong><a href="/funcionarios">Funcionários</a></strong> (menu Equipe). Lá você cria o login (e-mail) e a senha de cada pessoa com um clique. O funcionário também pode se auto-cadastrar pela opção <strong>Funcionário / Dependente</strong> no <a href="/login"><code>/login</code></a> e vincular à empresa informando o <strong>Código Único</strong> (ele aparece no painel Início). Cada funcionário acessa a <strong>agenda e os clientes</strong> — os relatórios financeiros ficam bloqueados para esse perfil. Use <strong>Desligar</strong> para remover o vínculo ou <strong>Remover</strong> para apagar a conta em definitivo.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Em quanto tempo recebo o reembolso de uma assinatura?</summary>
+          <p>O reembolso pode ser solicitado em até <strong>7 dias após a compra</strong> (CDC art. 49). Depois do envio do relatório pelo Gmail, a equipe confirma o reembolso e o valor é transferido para a <strong>chave Pix temporária</strong> informada no formulário — por isso pedimos uma chave aleatória e nunca o seu CPF.</p>
+        </details>
+      </div>
+
+      <div class="card">
+        <h3 class="section-title">Solicitação de Reembolso</h3>
+
+        <!-- Prazo estourado: substitui o formulário (decisão do servidor) -->
+        <div id="reb-alerta" hidden>
+          <div class="reb-aviso reb-aviso-erro">
+            <span aria-hidden="true">⚠️</span>
+            <span>Tempo excedido para a realização do reembolso. O prazo limite para solicitação é de até 7 dias após a compra.</span>
+          </div>
+          <p style="color:var(--text-muted);font-size:13.5px;line-height:1.6;margin:0;">
+            Ainda assim, fale com a nossa equipe pelo formulário ao lado — avaliamos cada caso
+            com atenção. O prazo acima é o do direito de arrependimento do consumidor.
+          </p>
+        </div>
+
+        <!-- Formulário (só dentro do prazo) -->
+        <div id="reb-form-box" hidden>
+          <div class="reb-aviso reb-aviso-info">
+            <span aria-hidden="true">💡</span>
+            <span>Atenção: O reembolso só será realizado após a solicitação ser enviada e confirmada via Gmail.</span>
+          </div>
+
+          <p id="reb-prazo" style="color:var(--text-muted);font-size:13px;margin:0 0 16px;"></p>
+
+          <form id="form-reembolso" novalidate>
+            <div class="field">
+              <label for="reb-pix">Chave Pix temporária / aleatória (EVP)</label>
+              <input type="text" id="reb-pix" class="reb-chave" autocomplete="off" spellcheck="false"
+                     placeholder="00000000-0000-0000-0000-000000000000"
+                     aria-describedby="reb-pix-erro">
+              <div class="reb-erro-campo" id="reb-pix-erro" role="alert"></div>
+              <p style="color:var(--text-muted);font-size:12px;margin:4px 0 0;">
+                Gere uma chave <strong>aleatória</strong> no app do seu banco. <strong>Não usamos CPF.</strong>
+              </p>
+            </div>
+
+            <div class="field">
+              <label for="reb-motivo">Motivo do reembolso / o que deveria melhorar</label>
+              <textarea id="reb-motivo" rows="6" placeholder="Conte-nos o motivo do reembolso e o que deveria melhorar..."
+                        aria-describedby="reb-motivo-erro"></textarea>
+              <div class="reb-erro-campo" id="reb-motivo-erro" role="alert"></div>
+            </div>
+
+            <button type="submit" class="btn btn-brass">Enviar solicitação</button>
+          </form>
+        </div>
+
+        <!-- Pós-envio: instrução oficial + atalhos Gmail -->
+        <div id="reb-enviado-box" hidden>
+          <div class="reb-aviso reb-aviso-info">
+            <span aria-hidden="true">📧</span>
+            <span>Realize a solicitação de reembolso pelo nosso gmail. Conte-nos o motivo do reembolso e o que deveria melhorar.</span>
+          </div>
+          <div class="reb-status-linha">
+            <span>Protocolo</span>
+            <span class="reb-chave" id="reb-protocolo">—</span>
+          </div>
+          <div class="reb-status-linha">
+            <span>Chave Pix</span>
+            <span class="reb-chave" id="reb-chave-enviada">—</span>
+          </div>
+          <div class="reb-status-linha">
+            <span>Situação</span>
+            <span id="reb-badge-status">—</span>
+          </div>
+          <div class="reb-envio-acoes">
+            <a href="#" id="reb-btn-gmail" class="btn btn-brass">Enviar Solicitação pelo Gmail</a>
+            <button type="button" id="reb-btn-confirmar" class="btn btn-outline">Já enviei o e-mail</button>
+          </div>
+          <p style="color:var(--text-muted);font-size:12.5px;margin:14px 0 0;line-height:1.55;">
+            Só depois de “Já enviei o e-mail” que a nossa equipe passa a ver o seu pedido.
+          </p>
+        </div>
+
+        <!-- Histórico do próprio barbeiro -->
+        <div id="reb-historico" hidden style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px;">
+          <h4 style="font-family:'Fraunces',serif;font-size:15px;margin:0 0 8px;color:var(--heading);">Meus pedidos</h4>
+          <div id="reb-lista"></div>
+        </div>
+      </div>
     </div>
 
   </main>
