@@ -1,6 +1,6 @@
 /* ============================================================
    Corte Comigo – public/js/catalogo.js
-   Catálogo público com busca server-like (RF-050..054).
+   Catálogo público com busca server-like (RF-050..054) + paginação.
    ============================================================ */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,7 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const filtroCidade = document.getElementById('filtro-cidade');
   const filtroServico = document.getElementById('filtro-servico');
   const sugestoesBox = document.getElementById('sugestoes');
+  const pagination = document.getElementById('pagination');
   if (!grid) return;
+
+  let currentPage = 1;
+  const LIMIT = 12;
 
   function intAbreviado(n) {
     n = Number(n || 0);
@@ -19,8 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function cardLoja(l) {
-    const capa = l.logo_url || l.cover_url; // foto de perfil manda no card
-    const capaStyle = capa ? ' style="background:#000 url(&quot;' + esc(capa) + '&quot;) center/cover no-repeat;"' : '';
+    const capa = l.logo_url || l.cover_url;
+    const capaStyle = capa ? ' style="background:#000 url("' + esc(capa) + '") center/cover no-repeat;"' : '';
     const tags = (l.tags || []).map(t => '<span class="tag">' + esc(t) + '</span>').join('');
     const match = l.type === 'service' && l.matched_service
       ? '<div class="salon-match">Serviço: <strong>' + esc(l.matched_service.name) + '</strong></div>'
@@ -86,7 +90,8 @@ document.addEventListener('DOMContentLoaded', () => {
         type: servico ? 'services' : 'shops',
         q: servico || termo,
         city: cidade,
-        limit: 60,
+        limit: LIMIT,
+        page: currentPage,
         sort: termo ? 'relevance' : 'rating'
       });
     } catch (e) {
@@ -96,6 +101,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     grid.innerHTML = res.items.map(cardLoja).join('');
     if (estadoVazio) estadoVazio.style.display = res.items.length ? 'none' : '';
+
+    renderPagination(res.total);
+  }
+
+  function renderPagination(total) {
+    if (!pagination) return;
+    const totalPages = Math.ceil(total / LIMIT);
+    if (totalPages <= 1) {
+      pagination.innerHTML = '';
+      return;
+    }
+
+    let html = '';
+    // Previous button
+    html += '<button class="page-btn" data-page="' + (currentPage - 1) + '"' + (currentPage === 1 ? ' disabled' : '') + '>‹ Anterior</button>';
+
+    // Page numbers (show up to 5 pages centered on current)
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) {
+      startPage = Math.max(1, endPage - 4);
+    }
+    for (let p = startPage; p <= endPage; p++) {
+      html += '<button class="page-btn' + (p === currentPage ? ' active' : '') + '" data-page="' + p + '">' + p + '</button>';
+    }
+
+    // Next button
+    html += '<button class="page-btn" data-page="' + (currentPage + 1) + '"' + (currentPage === totalPages ? ' disabled' : '') + '>Próxima ›</button>';
+
+    pagination.innerHTML = html;
+
+    // Event listeners
+    pagination.querySelectorAll('.page-btn:not(.active):not([disabled])').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentPage = parseInt(btn.dataset.page, 10);
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
   }
 
   /* ---------- autocomplete (RF-054) ---------- */
@@ -119,12 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         busca.value = btn.dataset.texto;
         sugestoesBox.hidden = true;
+        currentPage = 1;
         render();
       });
     });
   }
 
-  busca?.addEventListener('input', debounce(() => { renderSugestoes(); render(); }, 250));
+  busca?.addEventListener('input', debounce(() => { renderSugestoes(); currentPage = 1; render(); }, 250));
   busca?.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && sugestoesBox) sugestoesBox.hidden = true;
   });
@@ -133,8 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
       sugestoesBox.hidden = true;
     }
   });
-  filtroCidade?.addEventListener('change', render);
-  filtroServico?.addEventListener('change', render);
+  filtroCidade?.addEventListener('change', () => { currentPage = 1; render(); });
+  filtroServico?.addEventListener('change', () => { currentPage = 1; render(); });
 
   popularFiltros();
   render();
