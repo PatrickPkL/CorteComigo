@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!lista.length) {
       var trV = document.createElement('tr');
       var tdV = document.createElement('td');
-      tdV.colSpan = 7;
+      tdV.colSpan = 8;
       tdV.className = 'sa-vazio';
       tdV.textContent = statusRebAtual === 'REEMBOLSADO'
         ? 'Nenhum reembolso concluído no histórico.'
@@ -308,6 +308,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var tdLoja = document.createElement('td');
       tdLoja.textContent = r.loja_nome || '—' + (r.loja_cidade ? ' · ' + r.loja_cidade : '');
+
+      var tdPlano = document.createElement('td');
+      tdPlano.style.fontFamily = 'monospace';
+      tdPlano.textContent = (r.plano_nome || '—') + (r.plano_valor_mensal ? ' · R$ ' + Number(r.plano_valor_mensal).toFixed(2).replace('.', ',') : '');
 
       var tdConta = document.createElement('td');
       tdConta.className = 'sa-msg-trunc';

@@ -300,6 +300,34 @@ function enviarRedefinicaoSenha(email, token, nome) {
   }, "redefinir-senha");
 }
 
+function enviarNotificacaoReembolsoAdmin(dados) {
+  if (DEMO_MODE) {
+    console.log("[EMAIL - MODO DEMO] notificação reembolso admin ->", dados);
+    return Promise.resolve();
+  }
+
+  var subject = "⚠️ Nova Solicitação de Reembolso — " + (dados.loja_nome || "Loja");
+  var valorFmt = Number(dados.plano_valor || 0).toFixed(2).replace('.', ',');
+  var conteudo =
+    '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Nova solicitação de reembolso recebida (CDC Art. 49).</p>' +
+    '<div style="background-color:#f9f9f9;border-radius:6px;padding:16px;margin:16px 0;">' +
+      '<p style="color:#333333;font-size:14px;margin:0 0 8px 0;"><strong>Usuário:</strong> ' + (dados.usuario_nome || "—") + '</p>' +
+      '<p style="color:#333333;font-size:14px;margin:0 0 8px 0;"><strong>Loja:</strong> ' + (dados.loja_nome || "—") + '</p>' +
+      '<p style="color:#333333;font-size:14px;margin:0 0 8px 0;"><strong>Plano:</strong> ' + (dados.plano_nome || "—") + '</p>' +
+      '<p style="color:#333333;font-size:14px;margin:0 0 8px 0;"><strong>Valor do plano:</strong> R$ ' + valorFmt + '</p>' +
+      '<p style="color:#333333;font-size:14px;margin:0 0 8px 0;"><strong>Chave Pix (EVP):</strong> <code style="background:#f0f0f0;padding:4px 8px;border-radius:4px;font-family:monospace;">' + (dados.chave_pix || "—") + '</code></p>' +
+      '<p style="color:#333333;font-size:14px;margin:0;"><strong>Motivo:</strong> ' + (dados.motivo || "—") + '</p>' +
+    "</div>" +
+    '<p style="color:#555555;font-size:14px;margin:16px 0 0 0;">Acesse o painel Super Admin > Suporte > Reembolsos para analisar.</p>';
+
+  return enviarEmailComTimeout({
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
+    to: process.env.SUPER_ADMIN_EMAIL || "admin@cortecomigo.com",
+    subject: subject,
+    html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
+  }, "notificacao-reembolso-admin");
+}
+
 function enviarConfirmacaoAgendamento(email, dados) {
   var conteudo =
     '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá, ' + (dados.clienteNome || "cliente") + "!</p>" +
@@ -437,6 +465,7 @@ module.exports = {
   temEmailReal: temEmailReal,
   enviarRecuperacao: enviarRecuperacao,
   enviarRedefinicaoSenha: enviarRedefinicaoSenha,
+  enviarNotificacaoReembolsoAdmin: enviarNotificacaoReembolsoAdmin,
   enviarConfirmacaoAgendamento: enviarConfirmacaoAgendamento,
   enviarNovoAgendamento: enviarNovoAgendamento,
   enviarBoasVindas: enviarBoasVindas,

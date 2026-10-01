@@ -4503,6 +4503,24 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     };
     db.reembolsos.push(r);
     DB.salvar();
+
+    // Notificar super-admin por e-mail sobre nova solicitação
+    try {
+      const Mailer = require('./mailer');
+      const plano = (db.plans || []).find(p => {
+        const sub = (db.subscriptions || []).find(s => s.barbershop_id === shop.id);
+        return sub && p.id === sub.plan_id;
+      });
+      Mailer.enviarNotificacaoReembolsoAdmin({
+        usuario_nome: user.name,
+        loja_nome: shop.name,
+        plano_nome: plano ? plano.name : '—',
+        plano_valor: plano ? plano.price_monthly : 0,
+        chave_pix: chave,
+        motivo: motivo
+      }).catch(e => console.error('[api][reembolso] falha ao notificar admin:', e));
+    } catch (e) { console.error('[api][reembolso] mailer indisponível:', e); }
+
     return reembolsoPublico(r);
   }
 
@@ -4555,6 +4573,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       .map(r => {
         const u = (db.users || []).find(x => x.id === r.user_id);
         const loja = (db.barbershops || []).find(b => b.id === r.barbershop_id);
+        const sub = (db.subscriptions || []).find(s => s.barbershop_id === r.barbershop_id);
+        const plano = sub ? (db.plans || []).find(p => p.id === sub.plan_id) : null;
         return {
           id: r.id,
           status: r.status,
@@ -4563,6 +4583,8 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
           usuario_telefone: u ? (u.phone || '') : '',
           loja_nome: loja ? loja.name : '',
           loja_cidade: loja ? (loja.city || '') : '',
+          plano_nome: plano ? plano.name : '—',
+          plano_valor_mensal: plano ? plano.price_monthly : 0,
           temporary_pix_key: r.temporary_pix_key,
           motivo: r.reason,
           criadoEm: r.created_at,
@@ -4606,6 +4628,147 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     r.updated_at = agoraISO();
     DB.salvar();
     return { id: r.id, visible_to_admin: false };
+  }
+
+  /* ================= SUPER-ADMIN: SAÚDE DO SISTEMA (Situação) ================= */
+
+  function classificarProblema(metrica, valor, thresholds) {
+    if (valor >= thresholds.emergencia) return 'emergencia';
+    if (valor >= thresholds.problema) return 'problema';
+    if (valor >= thresholds.resolver) return 'resolver';
+    return 'leve';
+  }
+
+  function saSituacao() {
+    const db = _db();
+    const agora = Date.now();
+    const umDiaMs = 24 * 60 * 60 * 1000;
+    const umaHoraMs = 60 * 60 * 1000;
+
+    // Métricas de saúde
+    const metricas = [];
+
+    // 1. Memória do processo (Node.js)
+    const mem = process.memoryUsage();
+    const memUsageMB = Math.round(mem.heapUsed / 1024 / 1024);
+    const memLimitMB = Math.round(mem.heapTotal / 1024 / 1024);
+    const memPct = memLimitMB > 0 ? Math.round((memUsageMB / memLimitMB) * 100) : 0;
+    metricas.push({
+      nome: 'Memória (Heap)',
+      valor: memPct,
+      unidade: '%',
+      descricao: `${memUsageMB} MB / ${memLimitMB} MB`,
+      classificacao: classificarProblema('memoria', memPct, { resolver: 60, problema: 75, emergencia: 90 })
+    });
+
+    // 2. Pool de conexões PostgreSQL
+    const pool = require('./pool').knex;
+    const poolStats = {
+      used: pool.client.pool ? pool.client.pool.numUsed() : 0,
+      free: pool.client.pool ? pool.client.pool.numFree() : 0,
+      pending: pool.client.pool ? pool.client.pool.numPendingAcquires() : 0,
+      max: 10
+    };
+    const poolPct = poolStats.max > 0 ? Math.round((poolStats.used / poolStats.max) * 100) : 0;
+    metricas.push({
+      nome: 'Pool PostgreSQL',
+      valor: poolPct,
+      unidade: '%',
+      descricao: `${poolStats.used}/${poolStats.max} conexões (${poolStats.pending} aguardando)`,
+      classificacao: classificarProblema('pool', poolPct, { resolver: 50, problema: 70, emergencia: 85 })
+    });
+
+    // 3. Taxa de erro nas últimas 24h (audit_log)
+    const logs24h = (db.audit_log || []).filter(l => Date.parse(l.timestamp) > agora - umDiaMs);
+    const erros24h = logs24h.filter(l => l.acao && String(l.acao).startsWith('erro_')).length;
+    const totalLogs24h = logs24h.length;
+    const erroRate = totalLogs24h > 0 ? Math.round((erros24h / totalLogs24h) * 10000) / 100 : 0;
+    metricas.push({
+      nome: 'Taxa de Erro (24h)',
+      valor: erroRate,
+      unidade: '%',
+      descricao: `${erros24h} erros em ${totalLogs24h} operações`,
+      classificacao: classificarProblema('erros', erroRate, { resolver: 1, problema: 3, emergencia: 5 })
+    });
+
+    // 4. Assinaturas expiradas/trial vencido não renovadas
+    const subsExpiradas = (db.subscriptions || []).filter(s => s.status === 'expirada' || (s.status === 'trial' && s.trial_ends_at && Date.parse(s.trial_ends_at) < agora)).length;
+    metricas.push({
+      nome: 'Assinaturas Expiradas',
+      valor: subsExpiradas,
+      unidade: 'lojas',
+      descricao: `${subsExpiradas} lojas sem acesso ativo`,
+      classificacao: classificarProblema('expiradas', subsExpiradas, { resolver: 5, problema: 15, emergencia: 30 })
+    });
+
+    // 5. Pagamentos pendentes há mais de 1h
+    const pagamentosPendentes = (db.payments || []).filter(p => p.status === 'pending' && p.created_at && Date.parse(p.created_at) < agora - umaHoraMs).length;
+    metricas.push({
+      nome: 'Pagamentos Pendentes (>1h)',
+      valor: pagamentosPendentes,
+      unidade: 'pagamentos',
+      descricao: `${pagamentosPendentes} pagamentos não confirmados`,
+      classificacao: classificarProblema('pendentes', pagamentosPendentes, { resolver: 3, problema: 10, emergencia: 20 })
+    });
+
+    // 6. Reembolsos em análise há mais de 24h
+    const reembolsosAtrasados = (db.reembolsos || []).filter(r => r.status === 'EM_ANALISE' && r.created_at && Date.parse(r.created_at) < agora - umDiaMs).length;
+    metricas.push({
+      nome: 'Reembolsos Atrasados (>24h)',
+      valor: reembolsosAtrasados,
+      unidade: 'pedidos',
+      descricao: `${reembolsosAtrasados} pedidos sem resposta do admin`,
+      classificacao: classificarProblema('reembolsos_atraso', reembolsosAtrasados, { resolver: 2, problema: 5, emergencia: 10 })
+    });
+
+    // 7. Tickets abertos sem resposta há mais de 24h
+    const ticketsAtrasados = (db.tickets || []).filter(t => t.status === 'aberto' && t.created_at && Date.parse(t.created_at) < agora - umDiaMs).length;
+    metricas.push({
+      nome: 'Tickets Atrasados (>24h)',
+      valor: ticketsAtrasados,
+      unidade: 'tickets',
+      descricao: `${ticketsAtrasados} tickets sem resposta`,
+      classificacao: classificarProblema('tickets_atraso', ticketsAtrasados, { resolver: 3, problema: 8, emergencia: 15 })
+    });
+
+    // Classificação geral do sistema
+    const piorClassificacao = ['emergencia', 'problema', 'resolver', 'leve'].find(c => metricas.some(m => m.classificacao === c)) || 'leve';
+
+    return {
+      status_geral: piorClassificacao,
+      timestamp: new Date().toISOString(),
+      metricas,
+      resumo: {
+        total_lojas: (db.barbershops || []).length,
+        lojas_ativas: (db.subscriptions || []).filter(s => s.status === 'ativa').length,
+        lojas_trial: (db.subscriptions || []).filter(s => s.status === 'trial').length,
+        lojas_expiradas: (db.subscriptions || []).filter(s => s.status === 'expirada').length,
+        usuarios_totais: (db.users || []).length,
+        agendamentos_hoje: (db.appointments || []).filter(a => a.date === agoraISO().slice(0, 10)).length,
+        receita_mes_atual: (db.payments || []).filter(p => p.status === 'paid' && p.paid_at && String(p.paid_at).startsWith(agoraISO().slice(0, 7))).reduce((s, p) => s + (Number(p.amount_cents) || 0) / 100, 0)
+      }
+    };
+  }
+
+  /* ================= SUPER-ADMIN: LOGS DE ERRO ================= */
+  function saLogs(tipo, horas) {
+    const db = _db();
+    const corte = Date.now() - (horas * 60 * 60 * 1000);
+    let logs = (db.audit_log || []).filter(l => l.timestamp && Date.parse(l.timestamp) > corte);
+    if (tipo === 'erro') {
+      logs = logs.filter(l => l.acao && String(l.acao).startsWith('erro_'));
+    }
+    return logs
+      .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+      .slice(0, 200)
+      .map(l => ({
+        id: l.id,
+        timestamp: l.timestamp,
+        acao: l.acao,
+        user_id: l.user_id,
+        ip: l.ip_address,
+        extra: l.extra
+      }));
   }
 
   /* ================= LGPD — Exportação de Dados ================= */
@@ -4876,6 +5039,7 @@ function enviarSolicitacaoLGPD(dados) {
     superAdminLogin, superAdminAuth, superAdminLogout,
     saListarLojas, saListarUsuarios, saDetalheLoja,
     saAtualizarPlano, saExcluirLoja, saDashboard, saRelatorios,
+    saSituacao, saLogs,
     saTickets, saResponderTicket,
     saListarReembolsos, saMarcarReembolsoRealizado, saOcultarReembolso,
     saListarDenuncias, saResolverDenuncia,

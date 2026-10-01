@@ -287,6 +287,30 @@ body {
 }
 .badge-em_andamento { background: rgba(155,89,182,.15); color: #9b59b6; }
 
+/* Saúde do sistema (Situação) */
+.badge-emergencia {
+  background: rgba(231,76,60,.18);
+  color: var(--danger);
+  animation: pulse-alert 1.5s infinite;
+}
+.badge-problema {
+  background: rgba(243,156,18,.18);
+  color: #f39c12;
+}
+.badge-resolver {
+  background: rgba(241,196,15,.18);
+  color: #f1c40f;
+}
+.badge-leve {
+  background: rgba(46,204,113,.18);
+  color: var(--success);
+}
+
+@keyframes pulse-alert {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* ---------- botões ---------- */
 .sa-btn {
   padding: 8px 16px;

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" type="image/png" href="../public/assets/cortecertologo.png">
-<title>Dashboard · Super Admin · Corte Comigo</title>
+<title>Situação · Super Admin · Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -16,7 +16,7 @@
 <aside class="sa-sidebar">
   <div class="sa-sidebar-brand">Corte<span>Comigo</span></div>
   <nav class="sa-sidebar-nav">
-    <a href="index.html" class="active">
+    <a href="index.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <span>Dashboard</span>
     </a>
@@ -32,11 +32,11 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.8 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/></svg>
       <span>Denúncias</span>
     </a>
-<a href="suporte-sa.html">
+    <a href="suporte-sa.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
       <span>Suporte</span>
     </a>
-    <a href="situacao.html">
+    <a href="situacao.html" class="active">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 9v4"/></svg>
       <span>Situação</span>
     </a>
@@ -59,43 +59,94 @@
 
 <main class="sa-main">
   <div class="sa-header">
-    <h1>Dashboard</h1>
+    <h1>Situação do Sistema</h1>
+    <div class="sa-header-extra">
+      <span class="sa-status-badge" id="status-geral-badge">Carregando...</span>
+      <span style="margin-left:12px;color:var(--text-muted);font-size:13px;" id="ultima-atualizacao">—</span>
+      <button class="sa-btn sa-btn-ghost" id="btn-atualizar" style="margin-left:12px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Atualizar
+      </button>
+    </div>
   </div>
 
-  <div class="sa-stats-grid">
+  <!-- Cards de Resumo -->
+  <div class="sa-stats-grid" id="resumo-cards">
     <div class="sa-stat-card">
       <div class="sa-stat-label">Total Lojas</div>
-      <div class="sa-stat-value" id="stat-lojas">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Total Usuários</div>
-      <div class="sa-stat-value" id="stat-users">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Agendamentos Hoje</div>
-      <div class="sa-stat-value" id="stat-agendamentos">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Receita Total</div>
-      <div class="sa-stat-value" id="stat-receita">—</div>
-    </div>
-    <div class="sa-stat-card">
-      <div class="sa-stat-label">Lojas em Trial</div>
-      <div class="sa-stat-value" id="stat-trial">—</div>
+      <div class="sa-stat-value" id="resumo-lojas">—</div>
     </div>
     <div class="sa-stat-card">
       <div class="sa-stat-label">Lojas Ativas</div>
-      <div class="sa-stat-value" id="stat-ativas">—</div>
+      <div class="sa-stat-value" id="resumo-ativas">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Conversão Trial → Ativa</div>
-      <div class="sa-stat-value" id="stat-conversao">—</div>
+      <div class="sa-stat-label">Lojas em Trial</div>
+      <div class="sa-stat-value" id="resumo-trial">—</div>
     </div>
+    <div class="sa-stat-card">
+      <div class="sa-stat-label">Lojas Expiradas</div>
+      <div class="sa-stat-value" id="resumo-expiradas">—</div>
+    </div>
+    <div class="sa-stat-card">
+      <div class="sa-stat-label">Usuários Totais</div>
+      <div class="sa-stat-value" id="resumo-usuarios">—</div>
+    </div>
+    <div class="sa-stat-card">
+      <div class="sa-stat-label">Agendamentos Hoje</div>
+      <div class="sa-stat-value" id="resumo-agendamentos">—</div>
+    </div>
+    <div class="sa-stat-card">
+      <div class="sa-stat-label">Receita Mês Atual</div>
+      <div class="sa-stat-value" id="resumo-receita">—</div>
+    </div>
+  </div>
+
+  <!-- Métricas de Saúde -->
+  <div class="sa-table-wrap">
+    <h2 style="margin:24px 0 12px;font-size:18px;">Métricas de Saúde</h2>
+    <div class="sa-filtros" style="margin-bottom:16px;">
+      <button class="sa-filtro-btn active" data-filtro="todos">Todas</button>
+      <button class="sa-filtro-btn" data-filtro="emergencia">Emergência</button>
+      <button class="sa-filtro-btn" data-filtro="problema">Problema</button>
+      <button class="sa-filtro-btn" data-filtro="resolver">Resolver</button>
+      <button class="sa-filtro-btn" data-filtro="leve">Leve</button>
+    </div>
+    <table class="sa-table">
+      <thead>
+        <tr>
+          <th>Métrica</th>
+          <th>Valor</th>
+          <th>Detalhes</th>
+          <th>Classificação</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-metricas">
+        <tr><td colspan="4" class="sa-vazio">Carregando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Logs de Erro Recentes -->
+  <div class="sa-table-wrap" style="margin-top:32px;">
+    <h2 style="margin:24px 0 12px;font-size:18px;">Erros Recentes (24h)</h2>
+    <table class="sa-table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Ação</th>
+          <th>Extra</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-erros">
+        <tr><td colspan="3" class="sa-vazio">Carregando...</td></tr>
+      </tbody>
+    </table>
   </div>
 </main>
 
 <script src="../shared/js/shared.js"></script>
 <script src="js/super-auth.js"></script>
-<script src="js/super-admin.js"></script>
+<script src="js/situacao-sa.js"></script>
 </body>
 </html>

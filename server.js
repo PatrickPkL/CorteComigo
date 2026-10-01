@@ -792,6 +792,25 @@ function handleSuperAdmin(req, res, pathname, url) {
     }).catch(e => json(res, 400, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }));
   }
 
+  /* GET /api/super-admin/situacao */
+  if (rota === 'situacao' && !idParam && req.method === 'GET') {
+    try { const r = API.saSituacao(); json(res, 200, { ok: true, data: r }); }
+    catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
+    return;
+  }
+
+  /* GET /api/super-admin/logs?tipo=erro&horas=24 */
+  if (rota === 'logs' && !idParam && req.method === 'GET') {
+    try {
+      const url = new URL(req.url, 'http://localhost');
+      const tipo = url.searchParams.get('tipo') || 'erro';
+      const horas = parseInt(url.searchParams.get('horas') || '24', 10);
+      const r = API.saLogs(tipo, horas);
+      json(res, 200, { ok: true, data: r });
+    } catch (e) { json(res, 500, { ok: false, error: (e && (e.error || e.message)) || 'Erro.' }); }
+    return;
+  }
+
   json(res, 404, { ok: false, error: 'Rota super-admin não encontrada.' });
 }
 
