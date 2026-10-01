@@ -142,11 +142,19 @@ const RATE_MAX = 300;
    por todos os clientes — o teto viraria global e estouraria com o polling
    do painel. Resolve o IP real do cliente via X-Forwarded-For (primeiro
    hop) quando presente. */
+/* [SEGURANÇA] X-Forwarded-For só é confiável atrás de um proxy que o
+   sobrescreve. Aceitar o header unconditionally deixava qualquer cliente
+   forjar o IP e zerar o rate-limit por IP a cada requisição. Só usamos o
+   header quando TRUST_PROXY=1 (configurado em ambientes com proxy). */
+const _confiaProxy = process.env.TRUST_PROXY === '1';
+
 function ipDoRequest(req) {
-  const fwd = req.headers && req.headers['x-forwarded-for'];
-  if (fwd) {
-    const primeiro = String(fwd).split(',')[0].trim();
-    if (primeiro) return primeiro;
+  if (_confiaProxy) {
+    const fwd = req.headers && req.headers['x-forwarded-for'];
+    if (fwd) {
+      const primeiro = String(fwd).split(',')[0].trim();
+      if (primeiro) return primeiro;
+    }
   }
   return req.socket.remoteAddress || '0.0.0.0';
 }
@@ -198,7 +206,12 @@ const _authRequired = new Set([
   'minhasNotificacoes', 'naoLidasCount', 'marcarNotificacaoLida', 'marcarTodasLidas',
   'mePerfil', 'atualizarMe', 'atualizarPreferencias', 'excluirMinhaConta',
   'exportarMeusDados', 'revogarConsentimento', 'solicitarExclusao',
-  'enviarSolicitacaoLGPD', 'meusLogsDeAcesso', 'logoutTodosDispositivos',
+  /* enviarSolicitacaoLGPD NÃO exige sessão: a página /lgpd é pública e
+     é justamente o canal para quem NÃO tem conta exercer o direito de
+     acesso (art. 18 LGPD). Exigir login deixava o formulário público
+     retornando 401 para quem mais precisa dele. O limite por IP e a
+     validação de campos no backend continuam valendo. */
+  'meusLogsDeAcesso', 'logoutTodosDispositivos',
   'gerarCodigoExclusao', 'confirmarExclusao',
   'alternarFavorito', 'meusFavoritos',
   'criarTicket', 'ticketsDoSalao',
@@ -285,6 +298,20 @@ function sanitizarParams(v, profundidade) {
   return v;
 }
 
+/* Identidade usada no rate-limit por identidade.
+   Métodos cujo 1º argumento é a própria identidade (verifyCode,
+   recuperarAcesso, reenviarCodigo) recebem uma STRING — ler
+   args[0].email desses retornava sempre undefined e o limite por
+   identidade nunca era aplicado, sobrando só o contador global por IP. */
+function extrairIdentidade(args) {
+  const a0 = Array.isArray(args) ? args[0] : null;
+  if (typeof a0 === 'string' && a0.trim()) return a0.trim();
+  if (a0 && typeof a0 === 'object') {
+    return a0.email || a0.ident || a0.cpf || a0.login || a0.phone || null;
+  }
+  return null;
+}
+
 function handleRpc(req, res) {
   /* rate-limit por IP */
   const ip = ipDoRequest(req);
@@ -341,8 +368,8 @@ function handleRpc(req, res) {
        Sanitiza __proto__/prototype/constructor em payloads aninhados. */
     const argList = Array.isArray(args) ? args.map(a => sanitizarParams(a, 0)) : [];
 
-    // [SEGURANÇA] Rate-limit por identidade (e-mail/CPF) além do IP
-    const ident = (args && args[0] && (args[0].email || args[0].ident || args[0].cpf || args[0].login)) || null;
+    // [SEGURANÇA] Rate-limit por identidade (e-mail/telefone/login) além do IP
+    const ident = extrairIdentidade(args);
     if (ident) {
       const identKey = 'ident:' + String(ident).toLowerCase().trim();
       const recIdent = _failedAuthByIdent.get(identKey);
@@ -770,12 +797,21 @@ function handleSuperAdmin(req, res, pathname, url) {
 
 /* ---------------- webhook AbacatePay ---------------- */
 
+/* Chave do HMAC. O nome antigo era ABACATEPAY_PUBLIC_KEY, mas uma chave
+   PÚBLICA não pode ser segredo de HMAC: se ela estiver publicada (painel,
+   log, resposta de API), qualquer um forja a assinatura. Aceitamos a
+   variável antiga por compatibilidade, mas a nova é a correta. */
+function chaveHmacWebhook() {
+  return String(process.env.ABACATEPAY_WEBHOOK_HMAC_SECRET || '').trim() ||
+         String(process.env.ABACATEPAY_WEBHOOK_SECRET || '').trim();
+}
+
 /* Assinatura HMAC-SHA256 (base64) no header x-webhook-signature */
 function assinaturaValida(corpo, recebida) {
   try {
-    const pub = String(process.env.ABACATEPAY_PUBLIC_KEY || '').trim();
-    if (!pub || !recebida) return false;
-    const esperada = crypto.createHmac('sha256', pub)
+    const chave = chaveHmacWebhook();
+    if (!chave || !recebida) return false;
+    const esperada = crypto.createHmac('sha256', chave)
       .update(Buffer.from(corpo, 'utf8')).digest('base64');
     const a = Buffer.from(esperada);
     const b = Buffer.from(String(recebida));
@@ -783,19 +819,50 @@ function assinaturaValida(corpo, recebida) {
   } catch (e) { return false; }
 }
 
+/* Anti-replay: o evento precisa recair numa janela curta de tempo. Sem
+   isso, um payload capturado em trânsito pode ser reenviado à vontade. */
+const WEBHOOK_TOLERANCIA_MS = 5 * 60 * 1000;
+function timestampEventoValido(ev) {
+  try {
+    const dados = (ev && ev.data) || {};
+    const cand = [dados.timestamp, dados.date, ev.timestamp, ev.date];
+    for (const t of cand) {
+      if (t === undefined || t === null || t === '') continue;
+      const ms = typeof t === 'number' ? (t > 1e12 ? t : t * 1000) : Date.parse(t);
+      if (Number.isFinite(ms)) return Math.abs(Date.now() - ms) <= WEBHOOK_TOLERANCIA_MS;
+    }
+    /* Sem timestamp não dá para detectar replay — recusa (fail-closed). */
+    return false;
+  } catch (e) { return false; }
+}
+
 function handleWebhookAbacate(req, res, url) {
   let corpo = '';
+  let estourou = false;
   req.on('data', c => {
     corpo += c;
-    if (corpo.length > 2e6) req.destroy();
+    if (corpo.length > 256 * 1024) { estourou = true; req.destroy(); }
   });
+  req.on('error', () => { /* cliente abortou */ });
   req.on('end', () => {
-    const secretEnv = String(process.env.ABACATEPAY_WEBHOOK_SECRET || '').trim();
+    if (estourou) return;
+    /* [SEGURANÇA] FAIL-CLOSED. Antes a validação inteira vivia dentro de
+       `if (secretEnv)`: sem a variável configurada, NENHUMA checagem
+       acontecia e qualquer POST anônimo chegava a processarEventoWebhook,
+       que ativa o plano pago. Sem segredo configurado => 503 sempre. */
+    const secretEnv = chaveHmacWebhook();
+    if (!secretEnv) {
+      console.error('[webhook] ABACATEPAY_WEBHOOK_HMAC_SECRET/ABACATEPAY_WEBHOOK_SECRET não configurado — webhook rejeitado (fail-closed).');
+      return json(res, 503, { ok: false, error: 'Webhook não configurado.' });
+    }
     var urlOk = false;
     var hmacOk = false;
-    if (secretEnv) {
+    {
       const secretUrl = url.searchParams.get('webhookSecret') || '';
       if (secretUrl) {
+        /* [SEGURANÇA] Segredo em query string vaza em log de proxy, Referer
+           e histórico. Mantido por compatibilidade, mas avisado. */
+        console.warn('[webhook] autenticação por ?webhookSecret= está depreciada — migre para o header x-webhook-signature.');
         const a = Buffer.from(secretEnv, 'utf8');
         const b = Buffer.from(secretUrl, 'utf8');
         urlOk = a.length === b.length && crypto.timingSafeEqual(a, b);
@@ -810,6 +877,12 @@ function handleWebhookAbacate(req, res, url) {
     let ev;
     try { ev = JSON.parse(corpo || '{}'); }
     catch (e) { return json(res, 400, { ok: false, error: 'JSON inválido.' }); }
+    /* Anti-replay: rejeita evento com timestamp ausente ou fora da janela.
+       Uma assinatura válida de um payload antigo não pode reativar plano. */
+    if (!timestampEventoValido(ev)) {
+      console.warn('[webhook] evento sem timestamp válido — rejeitado (anti-replay).');
+      return json(res, 400, { ok: false, error: 'Evento expirado ou sem timestamp.' });
+    }
     try {
       const r = API.processarEventoWebhook(ev);
       // [SEGURANÇA] Não logar dados do evento (podem conter PII)

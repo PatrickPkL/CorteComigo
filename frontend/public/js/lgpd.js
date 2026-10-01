@@ -24,18 +24,35 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('E-mail inválido.');
       return;
     }
+    const digitos = telefone.replace(/\D/g, '');
+    if (telefone && (digitos.length < 10 || digitos.length > 13)) {
+      alert('Telefone inválido: use de 10 a 13 dígitos.');
+      return;
+    }
 
     btn.disabled = true;
     btn.textContent = 'Enviando...';
 
-    const protocolo = 'LGPD-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
+    try {
+      /* A solicitação é registrada no backend (protocolo real + aviso ao
+         DPO). Antes este formulário gerava um protocolo fictício no
+         navegador e imprimia no console: o titular recebia "solicitação
+         registrada" sem existir registro nenhum. */
+      const r = API.enviarSolicitacaoLGPD({
+        nome: nome, email: email, telefone: telefone,
+        tipo: tipo, descricao: descricao
+      });
 
-    /* Em produção, isso enviaria um e-mail para dpo@cortecomigo.com via backend.
-       Por agora, registra no console e mostra sucesso. */
-    console.log('[LGPD] Solicitação recebida:', { protocolo: protocolo, nome: nome, email: email, telefone: telefone, tipo: tipo, descricao: descricao });
-
-    document.getElementById('lgpd-form').style.display = 'none';
-    document.getElementById('lgpd-sucesso').style.display = 'block';
-    document.getElementById('lgpd-protocolo').textContent = 'Protocolo: ' + protocolo;
+      document.getElementById('lgpd-form').style.display = 'none';
+      document.getElementById('lgpd-sucesso').style.display = 'block';
+      document.getElementById('lgpd-protocolo').textContent =
+        'Protocolo: ' + ((r && r.protocolo) || 'registrado');
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Enviar solicitação';
+      const msg = (e && e.error) || 'Não foi possível registrar sua solicitação. Tente novamente.';
+      alert(msg);
+      if (window.console) console.error('[LGPD]', e);
+    }
   });
 });

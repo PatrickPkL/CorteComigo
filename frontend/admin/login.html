@@ -69,6 +69,18 @@
             <label for="cli-tel-cad">Telefone (com DDD) <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
             <input type="tel" id="cli-tel-cad" placeholder="(71) 99999-0000">
           </div>
+          <div class="field">
+            <label for="cli-senha">Senha</label>
+            <div class="password-wrapper">
+              <input type="password" id="cli-senha" placeholder="Crie uma senha forte" required autocomplete="new-password" minlength="8" maxlength="12">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <div id="cli-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
+            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
+          </div>
           <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
             <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">
             Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">Política de Privacidade</a>
@@ -113,6 +125,18 @@
             <label for="cad-tel">Telefone (com DDD)</label>
             <input type="tel" id="cad-tel" placeholder="(71) 99999-0000" required>
           </div>
+          <div class="field">
+            <label for="cad-senha">Senha</label>
+            <div class="password-wrapper">
+              <input type="password" id="cad-senha" placeholder="Crie uma senha forte" required autocomplete="new-password" minlength="8" maxlength="12">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <div id="cad-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
+            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
+          </div>
           <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
             <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">
             Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">Política de Privacidade</a>
@@ -140,7 +164,13 @@
           </div>
           <div class="field">
             <label for="dep-senha">Senha</label>
-            <input type="password" id="dep-senha" placeholder="••••••••" required autocomplete="current-password">
+            <div class="password-wrapper">
+              <input type="password" id="dep-senha" placeholder="••••••••" required autocomplete="current-password">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
           </div>
           <div class="field">
             <label for="dep-codigo">Código Único da empresa <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
@@ -167,7 +197,15 @@
           </div>
           <div class="field">
             <label for="dep-cad-senha">Senha</label>
-            <input type="password" id="dep-cad-senha" placeholder="•••••••• (mín. 6 caracteres)" minlength="6" required autocomplete="new-password">
+            <div class="password-wrapper">
+              <input type="password" id="dep-cad-senha" placeholder="•••••••• (mín. 8 caracteres)" minlength="8" maxlength="12" required autocomplete="new-password">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+            <div id="dep-cad-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
+            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
           </div>
           <div class="field">
             <label for="dep-cad-tel">Telefone (com DDD) <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
@@ -206,14 +244,24 @@
       <div id="etapa-recuperar" style="display:none;">
         <h3 class="section-title" style="margin-bottom:12px;">Recuperar acesso</h3>
         <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
-          Informe o e-mail cadastrado na sua conta. Enviamos um link de acesso para o seu e-mail.</p>
+          Para sua segurança, informe seu e-mail e a senha atual. Se conferir, enviaremos um link para redefinir a senha.</p>
         <form id="form-recuperar">
           <div class="field">
             <label for="input-rec-email">E-mail cadastrado</label>
             <input type="email" id="input-rec-email" placeholder="voce@email.com" required autocomplete="email">
           </div>
+          <div class="field">
+            <label for="input-rec-senha">Senha atual</label>
+            <div class="password-wrapper">
+              <input type="password" id="input-rec-senha" placeholder="Sua senha atual" required autocomplete="current-password">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+          </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
-            Enviar link por e-mail</button>
+            Enviar link de redefinição</button>
           <p style="text-align:center; margin-top:14px; font-size:13.5px;">
             Voltou? <a href="#" id="btn-voltar-recuperar" style="color:var(--brass);">Voltar ao login</a>
           </p>

@@ -40,6 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return txt;
   }
 
+  /* horários e serviços vêm do backend e podem faltar (profissional recém-
+     criado, vínculo apagado): sem este guard, p.services.map quebrava o
+     render inteiro e a tela ficava em branco. */
+  function servicosDoProf(p) {
+    return Array.isArray(p && p.services) ? p.services : [];
+  }
+
   function render() {
     let profs;
     try { profs = API.profissionaisDaLoja(loja.id, false); } catch (e) {
@@ -48,7 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     grid.innerHTML = profs.map(p =>
-      '<div class="card" data-id="' + p.id + '"' + (p.is_active ? '' : ' style="opacity:.55;"') + '>' +
+      '<div class="card" data-id="' + esc(p.id) + '"' + (p.is_active ? '' : ' style="opacity:.55;"') + '>' +
         '<div class="prof-card-top">' +
           '<div class="user-avatar user-avatar-lg"' +
             (p.color ? ' style="background:' + esc(p.color) + '22;color:' + esc(p.color) + ';border-color:' + esc(p.color) + '66;"' : '') + '>' +
@@ -60,15 +67,17 @@ document.addEventListener('DOMContentLoaded', () => {
             (p.bio ? '<div class="prof-card-esp">' + esc(p.bio) + '</div>' : '') +
           '</div>' +
         '</div>' +
-        '<div class="prof-card-horario">' + horarioDoProf(p.id) + '</div>' +
-        (p.services.length
-          ? '<div class="prof-card-servicos">' + p.services.map(s =>
+        '<div class="prof-card-horario">' + esc(horarioDoProf(p.id)) + '</div>' +
+        (servicosDoProf(p).length
+          ? '<div class="prof-card-servicos">' + servicosDoProf(p).map(s =>
               '<span class="chip">' + esc(s.name) + '</span>').join('') + '</div>'
           : '') +
-        '<button class="btn btn-outline btn-prof-editar" data-id="' + p.id + '">Editar</button> ' +
+        '<button class="btn btn-outline btn-prof-editar" data-id="' + esc(p.id) + '">Editar</button> ' +
+        /* desativarProfissional() só marca is_active=false (soft-delete):
+           dizer "Excluir" fazia o usuário achar que o histórico sumiu. */
         (p.is_active
-          ? '<button class="btn btn-danger btn-prof-desativar" data-id="' + p.id + '">Excluir</button>'
-          : '<button class="btn btn-outline btn-prof-reativar" data-id="' + p.id + '">Reativar</button>') +
+          ? '<button class="btn btn-outline btn-prof-desativar" data-id="' + esc(p.id) + '">Desativar</button>'
+          : '<button class="btn btn-outline btn-prof-reativar" data-id="' + esc(p.id) + '">Reativar</button>') +
       '</div>'
     ).join('') ||
     '<div class="empty-state" style="grid-column:1/-1;"><h3>Nenhum profissional</h3><p>Cadastre o primeiro membro da equipe.</p></div>';
@@ -80,9 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const sel = new Set((selecionados || []).map(String));
     box.innerHTML = servicosAtivos().map(s =>
       '<label class="check-inline">' +
-        '<input type="checkbox" value="' + s.id + '"' + (sel.has(s.id) ? ' checked' : '') + '> ' +
+        '<input type="checkbox" value="' + esc(s.id) + '"' + (sel.has(s.id) ? ' checked' : '') + '> ' +
         esc(s.name) + '</label>'
-    ).join('');
+    ).join('') || '<p style="color:var(--muted,#8a8a8a);font-size:13px;">Nenhum serviço ativo no salão.</p>';
   }
 
   function coletarServicos(containerId) {
@@ -119,15 +128,19 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('ep-fim').value = linha.end_time || '19:00';
       document.getElementById('ep-almoco-ini').value = linha.lunch_start || '';
       document.getElementById('ep-almoco-fim').value = linha.lunch_end || '';
-      preencherServicos('ep-servicos', prof.services.map(s => s.id));
+      preencherServicos('ep-servicos', servicosDoProf(prof).map(s => s.id));
       abrirModal(document.getElementById('modal-editar-profissional'));
     }
 
     if (offBtn) {
-      if (!confirm('Remover este profissional da equipe? O histórico é preservado.')) return;
+      if (!confirm(
+        'Desativar este profissional?\n\n' +
+        'Ele sai da equipe e não aparece mais na agenda, mas o histórico de ' +
+        'agendamentos e o cadastro são preservados. Você pode reativar depois.'
+      )) return;
       try {
         API.desativarProfissional(offBtn.dataset.id);
-        showToast('Profissional removido da equipe.', 'error');
+        showToast('Profissional desativado. O histórico foi preservado.');
         render();
       } catch (err2) {
         showToast(msgErro(err2), 'error');
@@ -148,19 +161,53 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ---------- novo ---------- */
   setupModal('btn-novo-profissional', 'modal-profissional', 'btn-fechar-modal-profissional');
 
+  /* Valida no front para dar erro na hora, sem fechar o modal. O backend
+     (_validarExpediente) valida de novo — front não é fronteira de
+     segurança. Antes, um expediente invertido era gravado e só quebrava
+     depois, já na agenda. */
+  function validarProfissional(prefixo, nome, telefone, email, inicio, fim, lIni, lFim) {
+    if (nome.trim().length < 2) return 'Informe o nome do profissional.';
+    const digitos = (telefone || '').replace(/\D/g, '');
+    if (digitos && (digitos.length < 10 || digitos.length > 13)) {
+      return 'Telefone inválido: use de 10 a 13 dígitos.';
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'E-mail inválido.';
+    if (!inicio || !fim) return 'Informe o início e o término do expediente.';
+    if (fim <= inicio) return 'O término deve ser depois do início do expediente.';
+    /* almoço é tudo-ou-nada: mensagem coerente com a do backend */
+    if (lIni || lFim) {
+      if (!lIni) return 'Informe o início do almoço, ou apague os dois campos.';
+      if (!lFim) return 'Informe o término do almoço, ou apague os dois campos.';
+      if (lFim <= lIni) return 'O término do almoço deve ser depois do início.';
+      if (lIni < inicio || lFim > fim) return 'O almoço precisa ficar dentro do expediente.';
+    }
+    return null;
+  }
+
   document.getElementById('form-profissional')?.addEventListener('submit', (e) => {
     e.preventDefault();
+    const nome = document.getElementById('pf-nome').value;
+    const telefone = document.getElementById('pf-telefone').value;
+    const email = document.getElementById('pf-email').value;
+    const inicio = document.getElementById('pf-inicio').value || '09:00';
+    const fim = document.getElementById('pf-fim').value || '19:00';
+    const lIni = document.getElementById('pf-almoco-ini').value || null;
+    const lFim = document.getElementById('pf-almoco-fim').value || null;
+
+    const problema = validarProfissional('pf', nome, telefone, email, inicio, fim, lIni, lFim);
+    if (problema) { showToast(problema, 'error'); return; }
+
     try {
       API.criarProfissional({
-        name: document.getElementById('pf-nome').value,
-        phone: document.getElementById('pf-telefone').value,
-        email: document.getElementById('pf-email').value,
+        name: nome.trim(),
+        phone: telefone.trim(),
+        email: email.trim(),
         color: document.getElementById('pf-cor').value,
         bio: document.getElementById('pf-bio').value,
-        start_time: document.getElementById('pf-inicio').value || '09:00',
-        end_time: document.getElementById('pf-fim').value || '19:00',
-        lunch_start: document.getElementById('pf-almoco-ini').value || null,
-        lunch_end: document.getElementById('pf-almoco-fim').value || null,
+        start_time: inicio,
+        end_time: fim,
+        lunch_start: lIni,
+        lunch_end: lFim,
         service_ids: coletarServicos('pf-servicos')
       });
       fecharModal(document.getElementById('modal-profissional'));
@@ -182,16 +229,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('form-editar-profissional')?.addEventListener('submit', (e) => {
     e.preventDefault();
+    const nome = document.getElementById('ep-nome').value;
+    const telefone = document.getElementById('ep-telefone').value;
+    const inicio = document.getElementById('ep-inicio').value || '09:00';
+    const fim = document.getElementById('ep-fim').value || '19:00';
+    const lIni = document.getElementById('ep-almoco-ini').value || null;
+    const lFim = document.getElementById('ep-almoco-fim').value || null;
+
+    const problema = validarProfissional('ep', nome, telefone, '', inicio, fim, lIni, lFim);
+    if (problema) { showToast(problema, 'error'); return; }
+
     try {
       API.atualizarProfissional(document.getElementById('ep-id').value, {
-        name: document.getElementById('ep-nome').value,
-        phone: document.getElementById('ep-telefone').value,
+        name: nome.trim(),
+        phone: telefone.trim(),
         color: document.getElementById('ep-cor').value,
         bio: document.getElementById('ep-bio').value,
-        start_time: document.getElementById('ep-inicio').value || '09:00',
-        end_time: document.getElementById('ep-fim').value || '19:00',
-        lunch_start: document.getElementById('ep-almoco-ini').value || null,
-        lunch_end: document.getElementById('ep-almoco-fim').value || null,
+        start_time: inicio,
+        end_time: fim,
+        lunch_start: lIni,
+        lunch_end: lFim,
         service_ids: coletarServicos('ep-servicos')
       });
       fecharModal(document.getElementById('modal-editar-profissional'));

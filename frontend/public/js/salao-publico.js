@@ -204,16 +204,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const box = document.getElementById('lista-reviews');
     if (!box) return;
     if (!reviewsGerais.length) {
-      box.innerHTML = '<p class="reviews-empty">Ainda sem avaliações — seja o primeiro a avaliar!</p>';
+      box.innerHTML = '<p class="reviews-empty" style="text-align:center; padding:24px; color:var(--text-muted);">Ainda sem avaliações — seja o primeiro a avaliar!</p>';
       return;
     }
-    box.innerHTML = reviewsGerais.slice(0, 8).map(r => {
+    box.innerHTML = reviewsGerais.slice(0, 10).map(r => {
       const n = Math.max(1, Math.min(5, Number(r.rating) || 0));
-      return '<div class="review-item">' +
-        '<div class="review-top"><strong>' + esc(r.client_name) + '</strong>' +
-          '<span class="rating">' + estrelasCheias(n) + '</span>' +
-          '<small>' + DB.fmtDataBR(String(r.created_at).slice(0, 10)) + '</small></div>' +
-        (r.comment ? '<p>' + esc(r.comment) + '</p>' : '') +
+      const estrelas = '★'.repeat(n) + '☆'.repeat(5 - n);
+      return '<div class="review-item" style="border-bottom:1px solid var(--line); padding:16px 0;">' +
+        '<div class="review-top" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px;">' +
+          '<strong style="font-size:15px;">' + esc(r.client_name) + '</strong>' +
+          '<span class="rating" style="color:#f5c518; font-size:18px; letter-spacing:2px;">' + estrelas + '</span>' +
+          '<small style="color:var(--text-muted); margin-left:auto;">' + DB.fmtDataBR(String(r.created_at).slice(0, 10)) + '</small>' +
+        '</div>' +
+        (r.comment ? '<p style="color:var(--text); line-height:1.6; margin:0;">' + esc(r.comment) + '</p>' : '') +
       '</div>';
     }).join('');
   }
@@ -223,24 +226,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!boxForm) return;
     const u = Auth.usuarioAtual();
     if (!u) {
-      boxForm.innerHTML = '<p class="review-convite">' +
-        'Já visitou este salão? <a href="/login?next=' + encodeURIComponent('/salao?id=' + loja.id) + '">Entre na sua conta</a> e deixe sua avaliação.' +
+      boxForm.innerHTML = '<p class="review-convite" style="text-align:center; padding:20px;">' +
+        'Já visitou este salão? <a href="/login?next=' + encodeURIComponent('/salao?id=' + loja.id) + '" style="color:var(--brass); font-weight:600;">Entre na sua conta</a> e deixe sua avaliação.' +
         '</p>';
       return;
     }
     boxForm.innerHTML =
-      '<h4 class="review-form-title">Deixe sua avaliação</h4>' +
+      '<h4 class="review-form-title" style="margin-bottom:16px;">Deixe sua avaliação</h4>' +
       '<form class="review-form" id="review-form">' +
-        '<div class="review-estrelas" id="review-estrelas">' +
-          [1, 2, 3, 4, 5].map(n =>
-            '<button type="button" class="estrela" data-nota="' + n + '" aria-label="' + n + ' estrela(s)">★</button>').join('') +
-          '<span class="review-valor" id="review-valor">Toque nas estrelas</span>' +
+        '<div class="review-estrelas" id="review-estrelas" style="display:flex; gap:8px; justify-content:center; margin-bottom:16px;">' +
+          [5, 4, 3, 2, 1].map(n =>
+            '<button type="button" class="estrela" data-nota="' + n + '" aria-label="' + n + ' estrela(s)" style="font-size:28px; background:none; border:none; color:#ddd; cursor:pointer; transition:transform .15s, color .15s;">★</button>').join('') +
+          '<span class="review-valor" id="review-valor" style="margin-left:12px; font-size:14px; color:var(--text-muted); align-self:center;">Toque nas estrelas</span>' +
         '</div>' +
-        '<div class="field">' +
-          '<textarea id="review-comentario" rows="3" maxlength="100" placeholder="Como foi sua experiência? (opcional, máx. 100 caracteres)"></textarea>' +
-          '<div class="review-char-count" id="review-char-count">0/100</div>' +
+        '<div class="field" style="margin-bottom:16px;">' +
+          '<textarea id="review-comentario" rows="4" maxlength="300" placeholder="Como foi sua experiência? O que gostou? O que pode melhorar? (opcional, máx. 300 caracteres)" style="min-height:100px;"></textarea>' +
+          '<div class="review-char-count" id="review-char-count" style="text-align:right; font-size:12px; color:var(--text-muted); margin-top:4px;">0/300</div>' +
         '</div>' +
-        '<button type="submit" class="btn btn-brass">Enviar avaliação</button>' +
+        '<button type="submit" class="btn btn-brass" style="width:100%; padding:14px; font-size:15px;">Enviar avaliação</button>' +
       '</form>';
 
     const estrelasEl = boxForm.querySelector('#review-estrelas');
@@ -254,11 +257,23 @@ document.addEventListener('DOMContentLoaded', () => {
         nota = Number(b.dataset.nota);
         estrelasEl.querySelectorAll('.estrela').forEach(x =>
           x.classList.toggle('ativa', Number(x.dataset.nota) <= nota));
+        estrelasEl.querySelectorAll('.estrela.ativa').forEach(s => s.style.color = '#f5c518');
+        estrelasEl.querySelectorAll('.estrela:not(.ativa)').forEach(s => s.style.color = '#ddd');
         valorEl.textContent = nota + ' de 5';
+        valorEl.style.color = '#f5c518';
+      });
+      b.addEventListener('mouseenter', () => {
+        const hoverNota = Number(b.dataset.nota);
+        estrelasEl.querySelectorAll('.estrela').forEach(x =>
+          x.style.color = Number(x.dataset.nota) <= hoverNota ? '#f5c518' : '#ddd');
+      });
+      b.addEventListener('mouseleave', () => {
+        estrelasEl.querySelectorAll('.estrela').forEach(x =>
+          x.style.color = x.classList.contains('ativa') ? '#f5c518' : '#ddd');
       });
     });
     texto.addEventListener('input', () => {
-      contadorChars.textContent = texto.value.length + '/100';
+      contadorChars.textContent = texto.value.length + '/300';
     });
     boxForm.querySelector('#review-form').addEventListener('submit', (e) => {
       e.preventDefault();

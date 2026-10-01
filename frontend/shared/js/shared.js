@@ -107,7 +107,7 @@ const CC = {
     const p = this.plano();
     if (!p) return false;
     if (Array.isArray(p.permissions) && p.permissions.length) return p.permissions.includes(chave);
-    return !!Number(p.price_monthly);
+    return false;
   }
 };
 

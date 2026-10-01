@@ -19,6 +19,15 @@ window.API = (function () {
   function agoraISO() { return new Date().toISOString(); }
   function agoraLocal() { return DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos()); }
 
+  /* Telefone canônico: só dígitos, com o DDI 55 removido quando o número
+     já vem com ele. Sem isso "+55 11 99999-0000" e "11999990000" viravam
+     duas contas diferentes (e dois phone_hash distintos). */
+  function normalizarTelefone(v) {
+    var d = String(v == null ? '' : v).replace(/\D/g, '');
+    if (d.length > 11 && d.slice(0, 2) === '55') d = d.slice(2);
+    return d;
+  }
+
   /* ================= LGPD — Auditoria ================= */
 
   function _auditLog(userId, acao, extra) {
@@ -129,16 +138,23 @@ window.API = (function () {
       if (plano) return { sub, plano };
     }
     if (modoGratuito()) return { sub: sub || null, plano: planoGratuitoPlataforma() };
-    return { sub: sub || null, plano: planoFree() };
+    return { sub: sub || null, plano: null };
   }
 
+  /* Permissões do plano (RF-066). */
   function funcionalidadesDe(shopId) {
     const { plano } = planoEfetivo(shopId);
-    return (plano && plano.permissions) || [];
+    if (!plano) return [];
+    if (!Array.isArray(plano.permissions) || plano.permissions.length === 0) {
+      return [];
+    }
+    return plano.permissions;
   }
 
   function temFuncionalidade(shopId, chave) {
-    return (funcionalidadesDe(shopId) || []).includes(chave);
+    const lista = funcionalidadesDe(shopId);
+    /* 'relatorios' é a permissão-mãe de relatorios/relatorios_diario. */
+    return lista.includes(chave) || lista.includes('relatorios');
   }
 
   function exigirFuncionalidade(shopId, chave, descricao) {
@@ -153,14 +169,14 @@ window.API = (function () {
       };
     }
   }
+  const _PERMISSOES_COMPLETAS = ['servicos', 'profissionais', 'clientes', 'agendar',
+    'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'];
 
   /* ---------------- Modo plataforma grátis (config global) ----------------
      O super-admin pode ligar "site_gratis": nesse modo TODAS as lojas têm
      acesso completo (funcionalidades e relatórios), sem exigir assinatura
      ativa. Os preços cadastrados permanecem intactos para quando o modo
      for desligado. */
-  const _PERMISSOES_COMPLETAS = ['servicos', 'profissionais', 'clientes', 'agendar',
-    'horarios', 'galeria', 'relatorios', 'notificacoes', 'exportar_csv'];
 
   function modoGratuito() {
     try {
@@ -357,8 +373,11 @@ function lojaPublica(l) {
   }
 
   function excluirLoja() {
-    const { user } = sessao();
-    deletarLojaCascade(Auth.salaoDoUsuario(user));
+    /* [SEGURANÇA] Só o DONO pode apagar o salão. Antes usava sessao() e
+       Auth.salaoDoUsuario, que devolvem loja também para barbeiro e
+       dependente — qualquer funcionário logado apagava o salão inteiro. */
+    const { user, shop } = exigirDono();
+    deletarLojaCascade(shop);
     DB.salvar();
     return { ok: true };
   }
@@ -1138,7 +1157,41 @@ function lojaPublica(l) {
       }));
   }
 
+  /* HH:MM → minutos; null/vazio/inválido = null */
+  function _hhmmParaMin(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(v).trim());
+    return m ? (Number(m[1]) * 60 + Number(m[2])) : NaN;
+  }
+
+  /* Ponto único de validação de expediente: create e update chegam aqui.
+     Sem isto, "09:00–08:00" era gravado e a agenda do profissional ficava
+     impossível (janela negativa). Almoço precisa caber dentro do expediente
+     e ser um intervalo real. */
+  function _validarExpediente(inicio, fim, lunchStart, lunchEnd) {
+    const i = _hhmmParaMin(inicio);
+    const f = _hhmmParaMin(fim);
+    if (Number.isNaN(i)) err(400, 'Horário de início inválido: use o formato HH:MM.');
+    if (Number.isNaN(f)) err(400, 'Horário de término inválido: use o formato HH:MM.');
+    if (f <= i) err(400, 'O término deve ser depois do início do expediente.');
+
+    const li = _hhmmParaMin(lunchStart);
+    const lf = _hhmmParaMin(lunchEnd);
+    /* almoço é tudo-ou-nada: informar só um dos lados é erro de
+       preenchimento, não "intervalo invertido" */
+    const temIni = lunchStart !== null && lunchStart !== undefined && lunchStart !== '';
+    const temFim = lunchEnd !== null && lunchEnd !== undefined && lunchEnd !== '';
+    if (!temIni && !temFim) return;
+    if (!temIni) err(400, 'Informe o início do almoço ou apague os dois campos.');
+    if (!temFim) err(400, 'Informe o término do almoço ou apague os dois campos.');
+    if (Number.isNaN(li)) err(400, 'Início do almoço inválido: use o formato HH:MM.');
+    if (Number.isNaN(lf)) err(400, 'Término do almoço inválido: use o formato HH:MM.');
+    if (lf <= li) err(400, 'O término do almoço deve ser depois do início.');
+    if (li < i || lf > f) err(400, 'O almoço precisa ficar dentro do expediente.');
+  }
+
   function gravarHorariosProfissional(shopId, profId, inicio, fim, lunchStart, lunchEnd) {
+    _validarExpediente(inicio, fim, lunchStart, lunchEnd);
     const db = DB._d();
     const diasLoja = db.working_hours.filter(w => w.barbershop_id == shopId && w.professional_id == null);
     // regrava dom–sáb [0..6] preservando os horários da loja (DT-09);
@@ -1178,6 +1231,25 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return null;
   }
 
+  /* RF-026 / DT-12 — cota de profissionais ATIVOS por plano.
+     `ignorarProfId` permite revalidar na reativação sem contar o próprio
+     profissional que está voltando. Usa planoEfetivo (não a assinatura
+     crua) para que loja expirada caia na cota do plano Free, e nunca
+     fique com limite ilimitado por herança de um plano pago vencido. */
+  function exigirCotaProfissionais(shopId, ignorarProfId) {
+    const db = DB._d();
+    const { plano } = planoEfetivo(shopId);
+    if (!plano || plano.max_professionals == null) return;
+    const limite = Number(plano.max_professionals);
+    if (!Number.isFinite(limite)) return;
+    const atuais = db.professionals.filter(p =>
+      p.barbershop_id === shopId && p.is_active && p.id !== ignorarProfId).length;
+    if (atuais >= limite) {
+      err(409, 'Limite do plano "' + plano.name + '" atingido (' + limite +
+        ' profissional(is) ativo(s)). Desative um profissional ou faça upgrade para adicionar mais.');
+    }
+  }
+
   function criarProfissional(dados) {
     const { shop } = exigirDono();
     exigirFuncionalidade(shop.id, 'profissionais', 'Criar profissionais');
@@ -1191,13 +1263,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const tel = String(dados.phone || '').replace(/\D/g, '');
 
     /* RF-026 / DT-12: plano limita nº de profissionais */
-    const sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
-    const plano = sub && db.plans.find(p => p.id === sub.plan_id);
-    const atuais = db.professionals.filter(p => p.barbershop_id === shop.id && p.is_active).length;
-    if (plano && plano.max_professionals != null && atuais >= plano.max_professionals) {
-      err(409, 'Limite do plano "' + plano.name + '" atingido (' + plano.max_professionals +
-        ' profissional(is)). Faça upgrade para adicionar mais.');
-    }
+    exigirCotaProfissionais(shop.id, null);
 
     /* RBAC: com e-mail ou telefone informado, o dono convida um barbeiro
        ajudante — cria (ou reaproveita) a conta de acesso usada no login */
@@ -1206,6 +1272,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       contaAcesso = usuarioContaAcesso(db, { email, tel });
       if (contaAcesso && contaAcesso.role === 'dono') {
         err(409, 'Este telefone/e-mail já pertence à conta de um dono de salão.');
+      }
+      /* [SEGURANÇA] Reaproveitar uma conta de cliente trocava o papel e
+         sobrescrevia o nome da pessoa — ela perdia o acesso de cliente sem
+         aviso. O cadastro do profissional não deve assumir identidades
+         existentes. */
+      if (contaAcesso && contaAcesso.role === 'cliente') {
+        err(409, 'Este e-mail já é uma conta de cliente. Crie o profissional sem e-mail/telefone e vincule a conta depois.');
       }
       if (contaAcesso &&
           db.professionals.some(p => p.barbershop_id === shop.id && p.user_id === contaAcesso.id)) {
@@ -1224,10 +1297,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
         };
         db.users.push(contaAcesso);
       } else {
-        if (contaAcesso.role === 'cliente') contaAcesso.role = 'barbeiro';
-        contaAcesso.name = nome;
-        if (email) contaAcesso.email = email;
-        if (tel) contaAcesso.phone = tel;
+        /* conta de barbeiro/dependente reaproveitada: nunca de cliente
+           (bloqueado acima). O nome pertence à PESSOA, não ao cadastro
+           profissional — sobrescrever aqui renomeava a conta de acesso sem
+           ela ter pedido. Só preenche o que ainda estiver vazio. */
+        if (!contaAcesso.name) contaAcesso.name = nome;
+        if (email && !contaAcesso.email) contaAcesso.email = email;
+        if (tel && !contaAcesso.phone) contaAcesso.phone = tel;
       }
     }
 
@@ -1289,11 +1365,15 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return DB._d().users.filter(u => u.role === 'dependente' && u.barbershop_id === shopId);
   }
 
-  /* Plano efetivo + cota de dependentes da loja. */
+  /* Plano efetivo + cota de dependentes da loja.
+     O plano usado é o mesmo de planoEfetivo (Free quando não há
+     assinatura válida,.site_gratis quando ligado). Antes lia a
+     assinatura crua: uma loja expirada/cancelada continuava usando a
+     cota do plano pago — e, se o plano for ilimitado (max_dependents
+     NULL), isso virava "dependentes infinitos para sempre". */
   function cotaDependentes(shopId) {
     const db = DB._d();
-    const sub = db.subscriptions.find(s => s.barbershop_id === shopId);
-    const plano = sub && db.plans.find(p => p.id === sub.plan_id);
+    const { plano } = planoEfetivo(shopId);
     const ativos = dependentesDaLoja(shopId);
     let limite;
     if (!plano) {
@@ -1301,7 +1381,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     } else if (plano.max_dependents == null) {
       limite = Infinity; // ilimitado (Salao Pro)
     } else {
-      limite = plano.max_dependents;
+      limite = Number(plano.max_dependents) || 0;
     }
     return { plano, ativos, limite, nomePlano: plano ? plano.name : 'sem plano' };
   }
@@ -1353,8 +1433,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       err(400, 'Informe um e-mail válido para ser o login do funcionário.');
     }
 
-    const senha = String((dados && dados.senha) || '');
-    if (senha.length < 6) err(400, 'A senha precisa ter ao menos 6 caracteres.');
+    const senha = validarForcaSenha((dados && dados.senha) || '');
 
     /* identidade não pode pertencer a outro papel importante */
     const existente = db.users.find(u => String(u.email || '').toLowerCase() === login);
@@ -1364,6 +1443,13 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       }
       if (existente.role === 'dependente') {
         err(409, 'Já existe um funcionário com este login nesta conta.');
+      }
+      /* [SEGURANÇA] Converter a conta de um cliente existente permitia que
+         qualquer dono assumisse a conta de um cliente apenas informando o
+         e-mail dele: trocava o papel, o nome e a senha. O vínculo correto é
+         o próprio cliente usando o Código Único (vincularDependente). */
+      if (existente.role === 'cliente') {
+        err(409, 'Este e-mail já é uma conta de cliente. Peça para a pessoa entrar com a própria conta e vincular o Código Único da empresa.');
       }
     }
 
@@ -1377,31 +1463,21 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     }
 
     const agora = DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos());
-    let conta;
-    if (existente) {
-      /* cliente existente vira dependente desta loja */
-      conta = existente;
-      conta.role = 'dependente';
-      conta.barbershop_id = shop.id;
-      conta.name = nome;
-      conta.password_hash = Auth.hashSenha(senha);
-      conta.email = login;
-      conta.verified = 1;
-    } else {
-      conta = {
-        id: DB.proximoId(),
-        role: 'dependente',
-        name: nome,
-        email: login,
-        phone: String((dados && dados.phone) || '').replace(/\D/g, ''),
-        verified: 1,
-        password_hash: Auth.hashSenha(senha),
-        barbershop_id: shop.id,
-        created_at: agora,
-        prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }
-      };
-      db.users.push(conta);
-    }
+    /* todo e-mail já existente foi rejeitado acima (dono/barbeiro/
+       dependente/cliente) — a conta é sempre nova a partir daqui */
+    const conta = {
+      id: DB.proximoId(),
+      role: 'dependente',
+      name: nome,
+      email: login,
+      phone: normalizarTelefone((dados && dados.phone) || ''),
+      verified: 1,
+      password_hash: Auth.hashSenha(senha),
+      barbershop_id: shop.id,
+      created_at: agora,
+      prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }
+    };
+    db.users.push(conta);
 
     _auditLog(user.id, 'criar_dependente', { dependente_id: conta.id });
     DB.salvar();
@@ -1572,8 +1648,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       err(400, 'Informe um e-mail válido.');
     }
 
-    const senha = String((dados && dados.senha) || '');
-    if (senha.length < 6) err(400, 'A senha precisa ter ao menos 6 caracteres.');
+    const senha = validarForcaSenha((dados && dados.senha) || '');
 
     if (!dados || !(dados.aceite_privacidade || dados.aceiteTermos)) {
       err(400, 'O aceite da Política de Privacidade e Termos de Uso é obrigatório.');
@@ -1696,7 +1771,18 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (patch.phone !== undefined) prof.phone = String(patch.phone);
     if (patch.color !== undefined) prof.color = patch.color;
     if (patch.bio !== undefined) prof.bio = String(patch.bio).trim();
-    if (patch.is_active !== undefined) prof.is_active = patch.is_active ? 1 : 0;
+    if (patch.is_active !== undefined) {
+      const querAtivar = patch.is_active ? 1 : 0;
+      /* [SEGURANÇA] A cota max_professionals era checada só em
+         criarProfissional. Reativar um profissional desativado passava
+         direto, então dava para contornar o limite: desativar o único
+         profissional do Autonomo, criar outro e reativar o primeiro.
+         Agora a cota vale na reativação também. */
+      if (querAtivar && !prof.is_active) {
+        exigirCotaProfissionais(shop.id, prof.id);
+      }
+      prof.is_active = querAtivar;
+    }
 
     /* regrava expediente usando os valores atuais como base (DT-09):
        um patch que só muda o almoço não reseta início/fim para o padrão */
@@ -2177,28 +2263,35 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!user) err(401, 'Faça login para agendar.');
 
     let shopId = payload.barbershop_id;
-    let origin = payload.origin || 'online';
-    if (!shopId && (user.role === 'dono' || user.role === 'barbeiro' || user.role === 'dependente')) {
+    const ehStaff = user.role === 'dono' || user.role === 'barbeiro' || user.role === 'dependente';
+    if (!shopId && ehStaff) {
       const loja = Auth.salaoDoUsuario(user);
-      if (loja) { shopId = loja.id; origin = origin === 'online' ? 'admin' : origin; }
+      if (loja) shopId = loja.id;
     }
     if (!shopId) err(400, 'Informe o salão do agendamento.');
     const shop = db.barbershops.find(b => b.id == shopId);
     if (!shop) err(404, 'Salão não encontrado.');
 
     /* staff só cria na própria loja — nunca numa alheia */
-    if (user.role === 'dono' || user.role === 'barbeiro' || user.role === 'dependente') {
+    let origemPainel = false;
+    if (ehStaff) {
       const minha = Auth.salaoDoUsuario(user);
       if (!minha || minha.id != shop.id) {
         err(403, 'Você só pode agendar pela sua própria loja.');
       }
+      origemPainel = true;
     }
 
-    /* assinatura em dia é exigida só do painel — o agendamento
-       público do catálogo não pune o cliente final (RF-039) */
-    if ((payload.origin || 'online') !== 'online') {
+    /* assinatura em dia é exigida para agendamentos públicos também —
+       link de agendamento para de funcionar quando a assinatura expira. */
+    if (!acessoLiberado(shop.id)) {
+      err(402, 'Esta barbearia está com a assinatura inativa. O agendamento online está temporariamente indisponível.');
+    }
+    /* staff pelo painel: exige feature 'agendar' além da assinatura */
+    if (origemPainel) {
       exigirFuncionalidade(shop.id, 'agendar', 'Criar agendamentos pelo painel');
     }
+    const origin = origemPainel ? 'admin' : 'online';
 
     const date = String(payload.date || '');
     const hora = String(payload.start_time || payload.hora || '');
@@ -2620,18 +2713,25 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     exigirFuncionalidade(shop.id, 'clientes', 'Cadastrar clientes');
     const nome = String(dados.name || '').trim();
     if (!nome) err(400, 'Nome é obrigatório.');
-    const tel = String(dados.phone || '').replace(/\D/g, '');
+    if (nome.length > 120) err(400, 'Nome muito longo (máximo 120 caracteres).');
+    const tel = normalizarTelefone(dados.phone);
+    if (tel && (tel.length < 10 || tel.length > 13)) {
+      err(400, 'Telefone inválido: use de 10 a 13 dígitos.');
+    }
 
     /* idempotente por telefone (RF-046) */
     if (tel) {
       const existe = DB._d().clients.find(c =>
-        c.barbershop_id === shop.id && c.phone === tel);
+        c.barbershop_id === shop.id && normalizarTelefone(c.phone) === tel);
       if (existe) return clientePublico(existe);
     }
 
+    const email = String(dados.email || '').trim().toLowerCase();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) err(400, 'E-mail inválido.');
+
     const c = {
       id: DB.proximoId(), barbershop_id: shop.id,
-      name: nome, phone: tel, email: String(dados.email || ''),
+      name: nome, phone: tel, email: email,
       notes: String(dados.notes || ''), total_visits: 0, total_spent: 0,
       last_visit_at: null, user_id: null, created_at: agoraLocal()
     };
@@ -2650,8 +2750,26 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       if (!n) err(400, 'Nome é obrigatório.');
       c.name = n;
     }
-    if (patch.phone !== undefined) c.phone = String(patch.phone).replace(/\D/g, '');
-    if (patch.email !== undefined) c.email = String(patch.email);
+    if (patch.phone !== undefined) {
+      const tel = normalizarTelefone(patch.phone);
+      if (tel) {
+        if (tel.length < 10) err(400, 'Telefone inválido: mínimo de 10 dígitos.');
+        if (tel.length > 13) err(400, 'Telefone inválido: máximo de 13 dígitos (com DDI).');
+        /* (barbershop_id, phone) é UNIQUE: aceitar telefone repetido no
+           mesmo salão quebra a persistência da coleção clients inteira */
+        const outro = DB._d().clients.find(x =>
+          x.id !== c.id && x.barbershop_id === shop.id && normalizarTelefone(x.phone) === tel);
+        if (outro) err(409, 'Já existe um cliente com este telefone neste salão.');
+        c.phone = tel;
+      } else {
+        c.phone = '';
+      }
+    }
+    if (patch.email !== undefined) {
+      const em = String(patch.email).trim().toLowerCase();
+      if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) err(400, 'E-mail inválido.');
+      c.email = em;
+    }
     if (patch.notes !== undefined) c.notes = String(patch.notes);
     DB.salvar();
     return clientePublico(c);
@@ -3314,10 +3432,23 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     if (!loja) err(404, 'Salão não encontrado.');
     const comment = String(dados.comment || '').trim();
     if (comment.length > 100) err(400, 'Comentário deve ter no máximo 100 caracteres.');
+
+    /* (barbershop_id, user_id) é UNIQUE: sem esta checagem a segunda
+       avaliação do mesmo salão quebra a persistência da coleção reviews */
+    const jaAvaliou = DB._d().reviews.find(r =>
+      r.barbershop_id == loja.id && r.user_id === user.id);
+    if (jaAvaliou) err(409, 'Você já avaliou este salão.');
+
+    /* vincula ao cliente cadastrado NESTA loja, quando houver. Sem o
+       filtro, um cliente de outra loja recebia client_id apontando para o
+       cadastro alheio. */
+    const meuCliente = DB._d().clients.find(c =>
+      c.user_id === user.id && c.barbershop_id === loja.id);
+
     const r = {
       id: DB.proximoId(),
       barbershop_id: loja.id,
-      client_id: null,
+      client_id: meuCliente ? meuCliente.id : null,
       user_id: user.id,
       client_name: user.name,
       rating: nota,
@@ -3528,8 +3659,12 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
   /* ================= ASSINATURAS E PLANOS (RF-057..061, DT-12) ================= */
 
+  /* Vitrine pública de planos. Respeita `active`: o super-admin desmarcar
+     "Ativo na vitrine" precisa esconder o plano da loja. O Free nunca
+     some — é o plano base de toda loja sem assinatura. */
   function listarPlanos() {
     return DB._d().plans
+      .filter(p => p.active !== false || p.is_free)
       .slice()
       .sort((a, b) => a.price_monthly - b.price_monthly)
       .map(p => ({ ...p }));
@@ -3600,6 +3735,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err(404, 'Plano não encontrado.');
     if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
+    /* [SEGURANÇA] `plans.active` era ignorado aqui: desmarcar "Ativo na
+       vitrine" no painel do super-admin não impedia contratar o plano. */
+    if (plano.active === false) err(400, 'Este plano não está disponível para contratação no momento.');
     const hoje = DB.hojeISO();
 
     const idx = db.subscriptions.findIndex(s => s.barbershop_id === shop.id);
@@ -3641,8 +3779,17 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err(404, 'Plano não encontrado.');
     if (plano.is_free) err(400, 'O plano Free não pode ser contratado.');
+    if (plano.active === false) err(400, 'Este plano não está disponível para contratação no momento.');
 
     const sub = db.subscriptions.find(s => s.barbershop_id === shop.id);
+    if (sub && sub.trial_usado === false &&
+        sub.trial_ends_at && sub.trial_ends_at < hoje) {
+      /* [SEGURANÇA] Selo de trial gasto herdado do provisionamento antigo
+         (provisionarSalao não gravava trial_usado). Sem isto o dono podia
+         renovar os 10 dias quantas vezes quizesse. */
+      sub.trial_usado = true;
+      DB.salvar();
+    }
     const hoje = DB.hojeISO();
     const emTrial = sub && sub.status === 'trial' && sub.trial_ends_at >= hoje;
     const pago = sub && sub.status === 'ativa' && sub.current_period_end >= hoje;
@@ -3883,22 +4030,99 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
   function atualizarMe(patch) {
     const user = sessao();
     const db = DB._d();
+    let mudou = false;
     if (patch.name !== undefined) {
       const n = String(patch.name).trim();
       if (!n) err(400, 'Nome é obrigatório.');
-      user.name = n;
+      if (n.length > 120) err(400, 'Nome muito longo (máximo 120 caracteres).');
+      if (n !== user.name) { user.name = n; mudou = true; }
     }
-    if (patch.email !== undefined) user.email = String(patch.email).trim();
+    if (patch.email !== undefined) {
+      const em = String(patch.email).trim().toLowerCase();
+      /* vazio = remover o e-mail da conta (fluxo LGPD), não gravar "" */
+      if (em) {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) err(400, 'E-mail inválido.');
+        const outro = db.users.find(u =>
+          u.id !== user.id && String(u.email || '').toLowerCase() === em);
+        /* o índice email_hash é UNIQUE: aceitar duplicata aqui poisons
+           toda a coleção users na persistência (não só este usuário) */
+        if (outro) err(409, 'Este e-mail já está cadastrado em outra conta.');
+        if (em !== String(user.email || '').toLowerCase()) { user.email = em; mudou = true; }
+      } else if (user.email) {
+        user.email = null; mudou = true;
+      }
+    }
     if (patch.phone !== undefined) {
-      const tel = String(patch.phone).replace(/\D/g, '');
-      if (tel.length < 10) err(400, 'Telefone inválido: mínimo de 10 dígitos.');
-      const outro = db.users.find(u => u.phone === tel && u.id !== user.id);
-      if (outro) err(409, 'Este telefone já está cadastrado.');
-      user.phone = tel;
+      const tel = normalizarTelefone(patch.phone);
+      if (tel) {
+        if (tel.length < 10) err(400, 'Telefone inválido: mínimo de 10 dígitos.');
+        if (tel.length > 13) err(400, 'Telefone inválido: máximo de 13 dígitos (com DDI).');
+        const outro = db.users.find(u => u.id !== user.id && normalizarTelefone(u.phone) === tel);
+        if (outro) err(409, 'Este telefone já está cadastrado.');
+        if (tel !== user.phone) { user.phone = tel; mudou = true; }
+      } else if (user.phone) {
+        user.phone = null; mudou = true;
+      }
     }
-    DB.salvar();
+    /* Troca de senha (RF-010/RF-045). Só conta Dependente tem senha —
+       dono e cliente entram por código/magic link. */
+    let senhaTrocada = false;
+    if (patch.senha !== undefined || patch.senha_atual !== undefined) {
+      senhaTrocada = trocarSenhaDaConta(user, patch);
+      mudou = true;
+    }
+
+    if (!mudou) return Auth.publicUser(user);
+    /* rastro LGPD: a tela de segurança mostra "alterar_dados" e sem esta
+       entrada a aba ficava permanentemente sem esse registro.
+       _auditLog já chama DB.salvar() — não salvar duas vezes. */
+    _auditLog(user.id, senhaTrocada ? 'alterar_senha' : 'alterar_dados', {
+      campos: senhaTrocada
+        ? ['senha']
+        : Object.keys(patch || {}).filter(k => ['name', 'email', 'phone'].indexOf(k) !== -1)
+    });
     localStorage.setItem('user', JSON.stringify(Auth.publicUser(user)));
     return Auth.publicUser(user);
+  }
+
+  /* Regras de senha: 8+ caracteres com letra e número. 6 caracteres sem
+     complexidade é curto demais para uma conta que dá acesso à agenda e
+     aos dados dos clientes da empresa. */
+  function validarForcaSenha(senha) {
+    const s = String(senha == null ? '' : senha);
+    if (s.length < 8) err(400, 'A senha deve ter no mínimo 8 caracteres.');
+    if (s.length > 200) err(400, 'Senha muito longa (máximo 200 caracteres).');
+    if (!/[A-Za-z]/.test(s)) err(400, 'A senha deve conter ao menos uma letra.');
+    if (!/[0-9]/.test(s)) err(400, 'A senha deve conter ao menos um número.');
+    return s;
+  }
+
+  /** Troca a senha da conta dependente. Exige a senha atual: sem isso,
+      quem herdar um dispositivo com sessão aberta troca a senha sem saber
+      a original. Dono/cliente não têm senha — sinaliza com 400. */
+  function trocarSenhaDaConta(user, patch) {
+    if (user.role !== 'dependente') {
+      err(400, 'Sua conta não usa senha — o acesso é por código enviado ao e-mail.');
+    }
+    const atual = String(patch.senha_atual == null ? '' : patch.senha_atual);
+    const nova = validarForcaSenha(patch.senha);
+    /* primeira senha (conta recém-criada sem hash) não exige a atual */
+    if (user.password_hash && !Auth.verificarSenha(atual, user.password_hash)) {
+      err(401, 'Senha atual incorreta.');
+    }
+    if (atual && nova === atual) {
+      err(400, 'A nova senha deve ser diferente da atual.');
+    }
+    user.password_hash = Auth.hashSenha(nova);
+    user.senha_trocada_em = agoraISO();
+    DB.salvar();
+    /* [SEGURANÇA] Senha trocada invalida as outras sessões: quem tinha a
+       senha antiga não continua autenticado em outro dispositivo. */
+    try {
+      db.sessions = (DB._d().sessions || []).filter(s => s.user_id !== user.id);
+      DB.salvar();
+    } catch (e) { /* sem coleção de sessões: segue o fluxo normal */ }
+    return true;
   }
 
   function atualizarPreferencias(prefs) {
@@ -3909,24 +4133,59 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return user.prefs;
   }
 
-  /** RF-010 — exclusão de conta com cascata completa. */
-  function gerarCodigoExclusao() {
+  /** RF-010 — exclusão de conta com cascata completa.
+      Exclusão é irreversível, então exigimos uma prova de posse. O e-mail
+      é a via padrão; sem ele (LGPD permite remover o e-mail da conta),
+      aceitamos a senha OU os últimos 4 dígitos do telefone — senão a
+      conta ficava sem caminho nenhum para se apagar. */
+  function gerarCodigoExclusao(dados) {
+    dados = dados || {};
     const user = sessao();
-    if (user.email == null) err(400, 'Sua conta não possui e-mail cadastrado — entre em contato com o suporte.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(user.email))) {
-      err(400, 'E-mail inválido na sua conta — entre em contato com o suporte.');
+    const emailOk = !!(user.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(user.email)));
+    const temSenha = !!(user.password_hash && Auth.verificarSenha(
+      String(dados.senha || ''), user.password_hash));
+    const tel = normalizarTelefone(user.phone);
+    const ultimos4 = String(dados.telefone || '').replace(/\D/g, '').slice(-4);
+    const telOk = !!(tel && tel.length >= 4 && ultimos4.length === 4 && ultimos4 === tel.slice(-4));
+
+    /* Sem e-mail válido, a senha ou o telefone viram a prova de posse.
+       Sem nenhum dos três não há como confirmar — e sem confirmar, não há
+       como excluir. */
+    if (!emailOk && !temSenha && !telOk) {
+      err(400, 'Confirme sua identidade para excluir a conta: informe a senha da conta ' +
+        'ou os últimos 4 dígitos do telefone cadastrado.');
     }
+
     const db = DB._d();
     const code = String(Math.floor(1000 + Math.random() * 9000));
     db._delete_codes = (db._delete_codes || []).filter(c => c.user_id !== user.id);
     db._delete_codes.push({ user_id: user.id, code: code, attempts: 0, expires_at: Date.now() + 300000 });
     DB.salvar();
-    /* envia por e-mail (em modo demo o Mailer loga no console) */
-    try {
-      Mailer.enviarCodigoExclusao(String(user.email), code).catch(function () {});
-    } catch (e) { /* best-effort — o código continua válido no servidor */ }
-    const mascarado = String(user.email).replace(/^(.)(.*)(@.*)$/, (m, a, b, d) => a + '****' + d);
-    return { ok: true, hint: 'Código enviado para ' + mascarado + '. Use nos próximos 5 minutos.' };
+
+    let enviado = false;
+    if (emailOk) {
+      try {
+        const p = Mailer.enviarCodigoExclusao(String(user.email), code);
+        if (p && typeof p.then === 'function') p.then(function () { enviado = true; }).catch(function () {});
+        else enviado = true;
+      } catch (e) { console.error('[exclusao] e-mail indisponivel:', e && e.message); }
+    }
+
+    const mascarado = emailOk
+      ? String(user.email).replace(/^(.)(.*)(@.*)$/, (m, a, b, d) => a + '****' + d)
+      : null;
+
+    /* Devolve o código quando não há para onde enviá-lo. Só acontece depois
+       que a identidade já foi provada por senha/telefone, então exibir não
+       abre brecha — é o que permite a conta sem e-mail se excluir. */
+    const mostrarCodigo = !enviado;
+    return {
+      ok: true,
+      hint: enviado
+        ? 'Código enviado para ' + mascarado + '. Use nos próximos 5 minutos.'
+        : 'Confirme o código abaixo para concluir a exclusão (válido por 5 minutos).',
+      codigo: mostrarCodigo ? code : undefined
+    };
   }
 
   function confirmarExclusao(code) {
@@ -3957,10 +4216,17 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       if (loja) deletarLojaCascade(loja);
     }
 
-    /* cancelar agendamentos futuros do cliente */
+    /* cancelar agendamentos FUTUROS do cliente.
+       O agendamento não tem campo `date`: a data vive em starts_at
+       (YYYY-MM-DDTHH:MM). Comparar a.date nunca era verdadeiro, então a
+       exclusão de conta deixava consultas futuras ativas.
+       A comparação é com agora (mesmo fuso/ formato dos registros), e não
+       com "hoje inteiro": um atendimento que já ocorreu hoje não deve ser
+       marcado como cancelado. */
+    var agora = DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos());
     (d.appointments || []).forEach(function(a) {
       if ((a.user_id === user.id || (d.clients || []).some(function(c) { return c.id === a.client_id && c.user_id === user.id; }))
-          && a.date >= DB.hojeISO() && a.status !== 'cancelado') {
+          && String(a.starts_at || '') >= agora && a.status !== 'cancelado') {
         a.status = 'cancelado';
         a.cancelled_by = 'sistema';
         a.cancel_reason = 'Exclusão de conta (LGPD)';
@@ -4422,12 +4688,35 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     return { ok: true, message: 'Solicitação registrada. Responderemos em até 15 dias úteis.' };
   }
 
-  function enviarSolicitacaoLGPD(dados) {
+/* Endpoint público (/lgpd): canal para exercer direito de acesso também
+   de quem não tem conta. Valida e limita o tamanho dos campos para não
+   virar canal de spam/abusar do e-mail do DPO.
+   Rate limit: 5 req/min por IP (além do global). */
+const _lgpdRate = new Map();
+const LGPD_RATE_MAX = 5;
+const LGPD_RATE_WINDOW = 60000;
+
+function enviarSolicitacaoLGPD(dados) {
+    const reqIp = (typeof window.__CC_REQUEST_IP === 'string') ? window.__CC_REQUEST_IP : '0.0.0.0';
+    const now = Date.now();
+    const rec = _lgpdRate.get(reqIp);
+    if (rec && now < rec.reset && rec.count >= LGPD_RATE_MAX) {
+      err(429, 'Muitas solicitações. Tente novamente em ' + Math.ceil((rec.reset - now) / 1000) + 's.');
+    }
+    if (!rec || now >= rec.reset) _lgpdRate.set(reqIp, { count: 1, reset: now + LGPD_RATE_WINDOW });
+    else rec.count++;
     var nome = String(dados.nome || '').trim();
-    var email = String(dados.email || '').trim();
+    var email = String(dados.email || '').trim().toLowerCase();
     var tipo = String(dados.tipo || '').trim();
+    var telefone = String(dados.telefone || '').replace(/\D/g, '');
     var descricao = String(dados.descricao || '').trim();
     if (!nome || !email || !tipo || !descricao) err(400, 'Todos os campos obrigatórios devem ser preenchidos.');
+    if (nome.length > 120) err(400, 'Nome muito longo (máximo 120 caracteres).');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) err(400, 'E-mail inválido.');
+    if (telefone && (telefone.length < 10 || telefone.length > 13)) {
+      err(400, 'Telefone inválido: use de 10 a 13 dígitos.');
+    }
+    if (descricao.length > 2000) err(400, 'Descrição muito longa (máximo 2000 caracteres).');
     var protocolo = 'LGPD-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2,4).toUpperCase();
     var d = DB._d();
     d.tickets = d.tickets || [];
@@ -4437,6 +4726,7 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       protocolo: protocolo,
       nome: nome,
       email: email,
+      telefone: telefone || '',
       descricao: descricao,
       status: 'aberto',
       created_at: new Date().toISOString()
@@ -4447,15 +4737,22 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
     var Mailer;
     try { Mailer = require('./mailer'); } catch(e) {}
     if (Mailer && Mailer.enviarEmail) {
+      /* escape dos campos: description/email vêm do formulário público */
+      var _e = function (s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      };
       Mailer.enviarEmail({
         to: dpoEmail,
         subject: '[LGPD] Solicitação ' + protocolo + ' — ' + tipo,
         html: '<h2>Solicitação LGPD</h2>' +
-              '<p><strong>Protocolo:</strong> ' + protocolo + '</p>' +
-              '<p><strong>Nome:</strong> ' + nome + '</p>' +
-              '<p><strong>E-mail:</strong> ' + email + '</p>' +
-              '<p><strong>Tipo:</strong> ' + tipo + '</p>' +
-              '<p><strong>Descrição:</strong></p><p>' + descricao + '</p>'
+              '<p><strong>Protocolo:</strong> ' + _e(protocolo) + '</p>' +
+              '<p><strong>Nome:</strong> ' + _e(nome) + '</p>' +
+              '<p><strong>E-mail:</strong> ' + _e(email) + '</p>' +
+              (telefone ? '<p><strong>Telefone:</strong> ' + _e(telefone) + '</p>' : '') +
+              '<p><strong>Tipo:</strong> ' + _e(tipo) + '</p>' +
+              '<p><strong>Descrição:</strong></p><p>' + _e(descricao).replace(/\n/g, '<br>') + '</p>'
       }).catch(function() {});
     }
     return { ok: true, protocolo: protocolo, message: 'Solicitação registrada. Responderemos em até 15 dias úteis.' };
@@ -4571,6 +4868,9 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
 
     // plataforma / assinatura (só o flag público; setters são internos)
     modoGratuito,
+    /* Plumbing interno entre módulos (payments.js precisa do plano
+       efetivo para cobrar price_per_employee). Não é usado pelo frontend. */
+    planoEfetivo,
 
     // super-admin
     superAdminLogin, superAdminAuth, superAdminLogout,

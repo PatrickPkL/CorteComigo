@@ -178,11 +178,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnGerar?.addEventListener('click', () => {
+    const senha = document.getElementById('input-senha-exclusao')?.value || '';
+    const telefone = document.getElementById('input-tel-exclusao')?.value || '';
     try {
-      const r = API.gerarCodigoExclusao();
+      const r = API.gerarCodigoExclusao({ senha, telefone });
       step1.style.display = 'none';
       step2.style.display = 'block';
-      showToast(r && r.hint ? r.hint : 'Código enviado por e-mail. Digite abaixo.');
+      showToast(r && r.hint ? r.hint : 'Código enviado. Digite abaixo.');
       if (inputCodigo) inputCodigo.focus();
     } catch (err2) {
       showToast(msgErro(err2), 'error');

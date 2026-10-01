@@ -271,9 +271,18 @@
     <div class="card" style="width:400px;">
       <h3 class="section-title" style="border-bottom-color:var(--danger);">Confirmar exclusão</h3>
       <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">
-        Clique em "Gerar código" para receber um código de 4 dígitos. A exclusão será irreversível.
+        A exclusão será irreversível. Confirme sua identidade para gerar o código de 4 dígitos.
       </p>
       <div id="excluir-cli-step-1">
+        <div class="field">
+          <label for="input-senha-exclusao">Senha da conta</label>
+          <input type="password" id="input-senha-exclusao" autocomplete="current-password"
+            placeholder="Deixe em branco se não tiver senha">
+        </div>
+        <div class="field">
+          <label for="input-tel-exclusao">Últimos 4 dígitos do telefone</label>
+          <input type="tel" id="input-tel-exclusao" inputmode="numeric" maxlength="4" placeholder="0000">
+        </div>
         <button class="btn btn-danger" id="btn-gerar-codigo-excluir-cli" type="button">Gerar código</button>
       </div>
       <div id="excluir-cli-step-2" style="display:none;">

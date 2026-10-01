@@ -118,15 +118,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tbProx.innerHTML = prox.map(a =>
       '<tr>' +
-        '<td>' + DB.fmtDataBR(a.date) + '</td>' +
+        '<td>' + esc(DB.fmtDataBR(a.date)) + '</td>' +
         '<td class="mono">' + esc(a.time) + '</td>' +
         '<td>' + esc(a.barbershop_name) + '</td>' +
         '<td>' + esc(a.services.map(s => s.name).join(' + ') || '—') + '</td>' +
         '<td>' + badgeStatus(a.status) + '</td>' +
         '<td style="white-space:nowrap;">' +
-          '<button class="btn btn-outline btn-acao" data-acao="reagendar" data-id="' + a.id + '" ' +
-            'data-shop="' + a.barbershop_id + '" data-date="' + a.date + '" data-time="' + a.time + '">Alterar</button> ' +
-          '<button class="btn btn-danger btn-cancelar" data-id="' + a.id + '">Cancelar</button>' +
+          '<button class="btn btn-outline btn-acao" data-acao="reagendar" data-id="' + esc(a.id) + '" ' +
+            'data-shop="' + esc(a.barbershop_id) + '" data-date="' + esc(a.date) + '" data-time="' + esc(a.time) + '">Alterar</button> ' +
+          '<button class="btn btn-danger btn-cancelar" data-id="' + esc(a.id) + '">Cancelar</button>' +
         '</td>' +
       '</tr>'
     ).join('');
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!confirm('Cancelar este agendamento?')) return;
     try {
       API.atualizarAgendamento(btn.dataset.id, { status: 'cancelado' });
-      showToast('Agendamento cancelado.', 'error');
+      showToast('Agendamento cancelado.', 'success');
       recarregar();
     } catch (err2) {
       showToast(msgErro(err2), 'error');
@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const disp = API.disponibilidade(agParaReagendar.shopId, dateISO);
       selReagHora.innerHTML = disp.available_slots.length
-        ? disp.available_slots.map(h => '<option value="' + h + '">' + h + '</option>').join('')
+        ? disp.available_slots.map(h => '<option value="' + esc(h) + '">' + esc(h) + '</option>').join('')
         : '<option value="">Nenhum horário livre</option>';
     } catch (e) {
       selReagHora.innerHTML = '<option value="">Erro ao carregar</option>';
@@ -217,15 +217,15 @@ document.addEventListener('DOMContentLoaded', () => {
       let acao = '';
       if (jaAvaliado) acao = '<button class="btn btn-outline" disabled>Avaliado</button>';
       else if (a.status === 'concluido') {
-        acao = '<button class="btn btn-outline btn-avaliar" data-id="' + a.id +
-          '" data-shop="' + a.barbershop_id + '">Avaliar</button>';
+        acao = '<button class="btn btn-outline btn-avaliar" data-id="' + esc(a.id) +
+          '" data-shop="' + esc(a.barbershop_id) + '">Avaliar</button>';
       }
       return '<tr>' +
-        '<td>' + DB.fmtDataBR(a.date) + '</td>' +
+        '<td>' + esc(DB.fmtDataBR(a.date)) + '</td>' +
         '<td>' + esc(a.barbershop_name) + '</td>' +
         '<td>' + esc(a.services.map(s => s.name).join(' + ') || '—') + '</td>' +
         '<td>' + esc(a.professional_name || '—') + '</td>' +
-        '<td class="mono">' + DB.fmtBRL(a.price_total) + '</td>' +
+        '<td class="mono">' + esc(DB.fmtBRL(a.price_total)) + '</td>' +
         '<td>' + acao + '</td>' +
       '</tr>';
     }).join('');
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.addEventListener('click', () => {
         try {
           API.alternarFavorito(btn.dataset.shop);
-          showToast('Removido dos favoritos.', 'error');
+          showToast('Removido dos favoritos.', 'success');
           renderFavoritos();
         } catch (err2) {
           showToast(msgErro(err2), 'error');
@@ -323,16 +323,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const capa = l.logo_url || l.cover_url; // foto de perfil manda no card
     const capaStyle = capa ? ' style="background:#000 url(&quot;' + esc(capa) + '&quot;) center/cover no-repeat;"' : '';
     return '<div class="fav-card">' +
-      '<a href="/salao?id=' + l.id + '" class="salon-card">' +
+      '<a href="/salao?id=' + encodeURIComponent(l.id) + '" class="salon-card">' +
         '<div class="salon-card-cover"' + capaStyle + '></div>' +
         '<div class="salon-card-body">' +
           '<div class="salon-name">' + esc(l.name) + '</div>' +
           '<div class="salon-meta"><span class="rating">★ ' +
-            Number(l.rating_avg || 0).toFixed(1) + '</span> · ' +
+            esc(Number(l.rating_avg || 0).toFixed(1)) + '</span> · ' +
             esc((l.city || '') + (l.uf ? ', ' + l.uf : '')) + '</div>' +
         '</div>' +
       '</a>' +
-      '<button class="btn btn-danger btn-fav-remover" data-shop="' + l.id + '">Remover</button>' +
+      '<button class="btn btn-danger btn-fav-remover" data-shop="' + esc(l.id) + '">Remover</button>' +
     '</div>';
   }
 
@@ -383,21 +383,38 @@ document.addEventListener('DOMContentLoaded', () => {
   /* ---------- configurações da conta ---------- */
   const fDados = document.getElementById('form-perfil-dados');
   if (fDados) {
-    fDados.querySelector('[name=nome]').value = usuario.name || '';
-    fDados.querySelector('[name=telefone]').value = usuario.phone || '';
-    fDados.querySelector('[name=email]').value = usuario.email || '';
+    const inpNome = fDados.querySelector('[name=nome]');
+    const inpTel = fDados.querySelector('[name=telefone]');
+    const inpEmail = fDados.querySelector('[name=email]');
+    if (inpNome) inpNome.value = usuario.name || '';
+    if (inpTel) inpTel.value = usuario.phone || '';
+    if (inpEmail) inpEmail.value = usuario.email || '';
     fDados.addEventListener('submit', (ev) => {
       ev.preventDefault();
+      const nome = (inpNome ? inpNome.value : '').trim();
+      const email = (inpEmail ? inpEmail.value : '').trim();
+      const tel = (inpTel ? inpTel.value : '').trim();
+
+      /* valida no cliente para não gastar ida ao servidor com dado
+         obviamente inválido (o back também valida) */
+      if (!nome) { showToast('Informe seu nome.', 'error'); return; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showToast('E-mail inválido. Deixe em branco para remover da conta.', 'error');
+        return;
+      }
+      const digitos = tel.replace(/\D/g, '');
+      if (tel && (digitos.length < 10 || digitos.length > 13)) {
+        showToast('Telefone inválido: use de 10 a 13 dígitos.', 'error');
+        return;
+      }
       try {
-        const u = API.atualizarMe({
-          name: fDados.querySelector('[name=nome]').value,
-          phone: fDados.querySelector('[name=telefone]').value,
-          email: fDados.querySelector('[name=email]').value
-        });
+        const u = API.atualizarMe({ name: nome, phone: tel, email: email });
         Object.assign(usuario, u);
         Auth.sincronizarUsuario(usuario); // cache local acompanha o servidor
         h1.textContent = u.name;
         avatar.textContent = DB.iniciais(u.name);
+        if (inpTel) inpTel.value = u.phone || '';
+        if (inpEmail) inpEmail.value = u.email || '';
         showToast('Dados pessoais atualizados!');
       } catch (err2) {
         showToast(msgErro(err2), 'error');
@@ -469,11 +486,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   btnGerarCli?.addEventListener('click', () => {
+    const senha = document.getElementById('input-senha-exclusao')?.value || '';
+    const telefone = document.getElementById('input-tel-exclusao')?.value || '';
     try {
-      const r = API.gerarCodigoExclusao();
+      const r = API.gerarCodigoExclusao({ senha, telefone });
       stepCli1.style.display = 'none';
       stepCli2.style.display = 'block';
-      showToast(r && r.hint ? r.hint : 'Código enviado por e-mail. Digite abaixo.');
+      showToast(r && r.hint ? r.hint : 'Código enviado. Digite abaixo.');
       if (inputCodigoCli) inputCodigoCli.focus();
     } catch (err2) {
       showToast(msgErro(err2), 'error');
@@ -481,16 +500,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   inputCodigoCli?.addEventListener('input', () => {
-    if (btnConfirmarCli) btnConfirmarCli.disabled = inputCodigoCli.value.length !== 4;
+    /* só dígitos: o botão ficava habilitado com "abcd" e o back devolvia
+       "código inválido" sem explicar nada */
+    const v = inputCodigoCli.value.replace(/\D/g, '');
+    if (v !== inputCodigoCli.value) inputCodigoCli.value = v;
+    if (btnConfirmarCli) btnConfirmarCli.disabled = v.length !== 4;
   });
 
   btnConfirmarCli?.addEventListener('click', () => {
-    const code = (inputCodigoCli?.value || '').trim();
-    if (code.length !== 4) return;
+    const code = (inputCodigoCli?.value || '').replace(/\D/g, '').trim();
+    if (code.length !== 4) {
+      showToast('Digite os 4 dígitos do código.', 'error');
+      return;
+    }
     try {
       API.confirmarExclusao(code);
       Auth.limparSessao();
-      showToast('Conta excluída.', 'error');
+      showToast('Conta excluída.', 'success');
       setTimeout(() => { window.location.href = '/catalogo'; }, 1200);
     } catch (err2) {
       showToast(msgErro(err2), 'error');
@@ -504,13 +530,23 @@ document.addEventListener('DOMContentLoaded', () => {
   var btnExportar = document.getElementById('btn-exportar-dados');
   if (btnExportar) {
     btnExportar.onclick = function() {
-      var r = API.exportarMeusDados();
-      var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url; a.download = 'cortecomigo-meus-dados-' + new Date().toISOString().slice(0,10) + '.json';
-      a.click();
-      URL.revokeObjectURL(url);
+      btnExportar.disabled = true;
+      try {
+        var r = API.exportarMeusDados();
+        var blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'cortecomigo-meus-dados-' + new Date().toISOString().slice(0,10) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Arquivo gerado. Confira seus downloads.', 'success');
+      } catch (e) {
+        showToast(msgErro(e), 'error');
+      } finally {
+        btnExportar.disabled = false;
+      }
     };
   }
 
@@ -519,8 +555,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnSairTodos) {
     btnSairTodos.onclick = function() {
       if (!confirm('Sair de todos os dispositivos? Você precisará fazer login novamente.')) return;
-      API.logoutTodosDispositivos();
-      Auth.logout();
+      try {
+        API.logoutTodosDispositivos();
+        showToast('Sessões encerradas.', 'success');
+        Auth.logout();
+        setTimeout(function() { window.location.href = '/catalogo'; }, 800);
+      } catch (e) { showToast(msgErro(e), 'error'); }
     };
   }
 

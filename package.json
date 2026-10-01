@@ -1,28 +1,29 @@
 {
-  "name": "corte-comigo",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Corte Comigo — agendamento para salões e barbearias (demo)",
-  "scripts": {
-    "dev": "node server.js",
-    "start": "node server.js",
-    "build": "echo 'No build required'",
-    "migrate": "knex migrate:latest",
-    "migrate:rollback": "knex migrate:rollback",
-    "migrate:status": "knex migrate:list",
-    "seed": "knex seed:run",
-    "db:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-db.ps1",
-    "db:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-db.ps1"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.116.0",
-    "bcryptjs": "^3.0.3",
-    "dotenv": "^17.4.2",
-    "imapflow": "^1.7.6",
-    "knex": "^3.3.0",
-    "nodemailer": "^9.0.5",
-    "pg": "^8.23.0",
-    "postal-mime": "^2.7.5",
-    "totalvoice-node": "^1.12.0"
-  }
+    "name":  "corte-comigo",
+    "version":  "1.0.0",
+    "private":  true,
+    "description":  "Corte Comigo — agendamento para salões e barbearias (demo)",
+    "scripts":  {
+                    "dev":  "node server.js",
+                    "start":  "node server.js",
+                    "build":  "echo \u0027No build required\u0027",
+                    "migrate":  "knex migrate:latest",
+                    "migrate:rollback":  "knex migrate:rollback",
+                    "migrate:status":  "knex migrate:list",
+                    "seed":  "knex seed:run",
+                    "setup":  "node scripts/setup-production.js",
+                    "db:start":  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-db.ps1",
+                    "db:stop":  "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-db.ps1"
+                },
+    "dependencies":  {
+                         "@supabase/supabase-js":  "^2.116.0",
+                         "bcryptjs":  "^3.0.3",
+                         "dotenv":  "^17.4.2",
+                         "imapflow":  "^1.7.6",
+                         "knex":  "^3.3.0",
+                         "nodemailer":  "^9.0.5",
+                         "pg":  "^8.23.0",
+                         "postal-mime":  "^2.7.5",
+                         "totalvoice-node":  "^1.12.0"
+                     }
 }

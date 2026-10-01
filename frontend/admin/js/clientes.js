@@ -40,9 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
         '<td>' + esc(c.name) + ' ' + (c.blocked ? '<span class="badge-status st-cancelado">Bloqueado</span>' : '') + '</td>' +
         '<td class="mono">' + esc(c.phone || '—') + '</td>' +
         '<td>' + esc(c.email || '—') + '</td>' +
-        '<td>' + (c.last_visit_at ? DB.fmtDataBR(String(c.last_visit_at).slice(0, 10)) : '—') + '</td>' +
-        '<td>' + c.total_visits + ' · <span class="mono">' + DB.fmtBRL(c.total_spent) + '</span></td>' +
-        '<td><button class="btn btn-outline btn-ver-perfil" data-id="' + c.id + '">Ver perfil</button></td>' +
+        '<td>' + esc(c.last_visit_at ? DB.fmtDataBR(String(c.last_visit_at).slice(0, 10)) : '—') + '</td>' +
+        '<td>' + esc(String(c.total_visits)) + ' · <span class="mono">' + esc(DB.fmtBRL(c.total_spent)) + '</span></td>' +
+        '<td><button class="btn btn-outline btn-ver-perfil" data-id="' + esc(c.id) + '">Ver perfil</button></td>' +
       '</tr>'
     ).join('');
 
@@ -66,14 +66,16 @@ document.addEventListener('DOMContentLoaded', () => {
     clienteAtual = c;
 
     document.getElementById('cp-titulo').textContent = 'Perfil · ' + c.name;
+    /* btn-cp-bloquear/desbloquear/salvar já têm type="button" no HTML e não
+       estão dentro de <form>; nada a corrigir aqui. */
     document.getElementById('cp-info').innerHTML =
       '<p style="color:var(--text-muted);font-size:14px;margin-bottom:4px;">Telefone: ' +
         '<strong style="color:var(--text)" class="mono">' + esc(c.phone || '—') + '</strong></p>' +
       '<p style="color:var(--text-muted);font-size:14px;">E-mail: ' +
         '<strong style="color:var(--text)">' + esc(c.email || '—') + '</strong></p>' +
       '<p style="color:var(--text-muted);font-size:14px;">Visitas: <strong style="color:var(--text)">' +
-        c.total_visits + '</strong> · Total gasto: <strong style="color:var(--text)" class="mono">' +
-        DB.fmtBRL(c.total_spent) + '</strong></p>';
+        esc(String(c.total_visits)) + '</strong> · Total gasto: <strong style="color:var(--text)" class="mono">' +
+        esc(DB.fmtBRL(c.total_spent)) + '</strong></p>';
 
     setVal('cp-telefone', c.phone || '');
     setVal('cp-email', c.email || '');
@@ -105,27 +107,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tabela.innerHTML = ags.slice(0, 8).map(a =>
       '<tr>' +
-        '<td>' + fmtDataHoraBR(a.starts_at) + '</td>' +
+        '<td>' + esc(fmtDataHoraBR(a.starts_at)) + '</td>' +
         '<td>' + esc(a.services.map(s => s.name).join(' + ') || '—') + '</td>' +
-        '<td class="mono">' + DB.fmtBRL(a.price_total) + '</td>' +
+        '<td class="mono">' + esc(DB.fmtBRL(a.price_total)) + '</td>' +
         '<td>' + badgeStatus(a.status) + '</td>' +
       '</tr>'
     ).join('') || '<tr><td colspan="4" style="color:var(--text-muted)">Sem histórico.</td></tr>';
   }
 
-  document.getElementById('btn-cp-salvar')?.addEventListener('click', () => {
+  document.getElementById('btn-cp-salvar')?.addEventListener('click', (ev) => {
     if (!clienteAtual) return;
+    const btn = ev.currentTarget;
+    const inpTel = document.getElementById('cp-telefone');
+    const inpEmail = document.getElementById('cp-email');
+    const tel = (inpTel ? inpTel.value : '').trim();
+    const email = (inpEmail ? inpEmail.value : '').trim();
+
+    /* validava nada: gravava "  " como telefone e sobrepunha o e-mail
+       existente com string vazia */
+    if (tel) {
+      const d = tel.replace(/\D/g, '');
+      if (d.length < 10 || d.length > 13) {
+        showToast('Telefone inválido: use de 10 a 13 dígitos.', 'error');
+        if (inpTel) inpTel.focus();
+        return;
+      }
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('E-mail inválido.', 'error');
+      if (inpEmail) inpEmail.focus();
+      return;
+    }
+    /* NÃO bloquear telefone igual ao atual: o mesmo botão salva as notas
+       também, e quem só edita a observação não mudou o telefone. O backend
+       já ignora o próprio id na checagem de duplicidade. */
+
+    btn.disabled = true;
     try {
       API.atualizarCliente(clienteAtual.id, {
         notes: document.getElementById('cp-notas').value,
-        phone: document.getElementById('cp-telefone')?.value ?? undefined,
-        email: document.getElementById('cp-email')?.value ?? undefined
+        phone: tel,
+        email: email
       });
       showToast('Cliente atualizado!');
       fecharModal(modal);
       render();
     } catch (e) {
       showToast(msgErro(e), 'error');
+    } finally {
+      btn.disabled = false;
     }
   });
 

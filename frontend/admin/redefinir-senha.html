@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<base href="/admin/">
+<link rel="icon" type="image/png" href="../public/assets/cortecertologo.png">
+<title>Redefinir Senha · Corte Comigo</title>
+<script src="../shared/js/tema-inicio.js"></script>
+<link rel="stylesheet" href="../shared/css/base.css">
+<link rel="stylesheet" href="../shared/css/components.css">
+<link rel="stylesheet" href="css/admin.css">
+<link rel="stylesheet" href="css/admin-login.css">
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--paper);
+    font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+  }
+  .reset-card {
+    background: var(--paper-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: var(--shadow-lg);
+  }
+  .reset-brand {
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .reset-brand span { color: var(--brass); }
+  .reset-subtitle {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: .9rem;
+    margin-bottom: 28px;
+  }
+  .form-group { margin-bottom: 20px; }
+  .form-group label {
+    display: block;
+    color: var(--text-muted);
+    font-size: .8rem;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .password-wrapper { position: relative; }
+  .password-wrapper input { padding-right: 48px !important; }
+  .password-toggle {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .password-toggle:hover { color: var(--text); }
+  .password-toggle:focus { outline: none; }
+  .password-toggle:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; border-radius: 4px; }
+  .form-group input {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--field-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: .95rem;
+    font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .form-group input:focus { border-color: var(--brass); }
+  .strength-meter { margin-top: 8px; }
+  .strength-bar { height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
+  .strength-bar-fill { height: 100%; transition: width .2s, background .2s; }
+  .strength-text { font-size: 12px; margin-left: 8px; }
+  .form-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  .btn-submit {
+    width: 100%;
+    padding: 14px;
+    background: var(--brass);
+    border: none;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: .95rem;
+    font-weight: 600;
+    font-family: 'Work Sans', system-ui, -apple-system, sans-serif;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity .2s;
+  }
+  .btn-submit:hover { opacity: .88; }
+  .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
+  .error-msg {
+    color: var(--danger);
+    font-size: .82rem;
+    text-align: center;
+    margin-top: 12px;
+    display: none;
+  }
+  .success-msg {
+    color: var(--success);
+    font-size: .85rem;
+    text-align: center;
+    margin-top: 12px;
+    display: none;
+  }
+  .back-link {
+    text-align: center;
+    margin-top: 20px;
+    font-size: .9rem;
+  }
+  .back-link a { color: var(--brass); text-decoration: none; }
+  .back-link a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="reset-card">
+  <div class="reset-brand">Corte<span>Comigo</span></div>
+  <p class="reset-subtitle">Defina sua nova senha</p>
+
+  <form id="reset-form" novalidate>
+    <div class="form-group">
+      <label for="nova-senha">Nova senha</label>
+      <div class="password-wrapper">
+        <input type="password" id="nova-senha" name="novaSenha" placeholder="Crie uma senha forte" required autocomplete="new-password" minlength="8" maxlength="12">
+        <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+          <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+      <div id="senha-forca" class="strength-meter"></div>
+      <p class="form-hint">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</p>
+    </div>
+
+    <div class="form-group">
+      <label for="confirmar-senha">Confirmar nova senha</label>
+      <div class="password-wrapper">
+        <input type="password" id="confirmar-senha" name="confirmarSenha" placeholder="Repita a nova senha" required autocomplete="new-password" minlength="8" maxlength="12">
+        <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+          <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <button type="submit" class="btn-submit" id="btn-submit">Salvar nova senha</button>
+    <div class="error-msg" id="error-msg"></div>
+    <div class="success-msg" id="success-msg"></div>
+  </form>
+
+  <div class="back-link">
+    <a href="/admin/login.html">← Voltar ao login</a>
+  </div>
+</div>
+
+<script src="../shared/js/shared.js"></script>
+<script src="../shared/js/api.js"></script>
+<script src="js/redefinir-senha.js"></script>
+</body>
+</html>

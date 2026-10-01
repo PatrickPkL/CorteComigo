@@ -255,6 +255,7 @@ const MAP = [
       id: p.id, barbershop_id: p.barbershop_id, plan_id: p.plan_id || null, amount_cents: p.amount_cents,
       status: p.status || 'pending', provider: p.provider || 'demo', abacate_id: p.abacate_id,
       br_code: p.br_code, qr_base64: p.qr_base64, dev_mode: tagBool(p.dev_mode),
+      billing_period: Number(p.billing_period || 30), installments: Number(p.installments || 1), metodo: p.metodo || 'pix',
       refunded_at: toPgDate(p.refunded_at), refund_reason: p.refund_reason || null, refund_id: p.refund_id || null,
       created_at: toPgDate(p.created_at) || new Date(), expires_at: toPgDate(p.expires_at), paid_at: toPgDate(p.paid_at)
     }),
@@ -262,6 +263,9 @@ const MAP = [
       id: r.id, barbershop_id: r.barbershop_id, plan_id: r.plan_id, amount_cents: r.amount_cents,
       status: r.status, provider: r.provider, abacate_id: r.abacate_id, br_code: r.br_code,
       qr_base64: r.qr_base64, dev_mode: r.dev_mode ? 1 : 0,
+      billing_period: r.billing_period == null ? 30 : Number(r.billing_period),
+      installments: r.installments == null ? 1 : Number(r.installments),
+      metodo: r.metodo || 'pix',
       refunded_at: toMemDate(r.refunded_at, 'iso'), refund_reason: r.refund_reason || null, refund_id: r.refund_id || null,
       created_at: toMemDate(r.created_at, 'iso'), expires_at: toMemDate(r.expires_at, 'iso'), paid_at: toMemDate(r.paid_at, 'iso')
     })
@@ -480,7 +484,7 @@ const CASTS = {
   clients: { barbershop_id: 'uuid', user_id: 'uuid', total_spent: 'numeric', last_visit_at: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
   plans: { max_professionals: 'int', max_dependents: 'int', features: 'text[]', permissions: 'text[]', is_free: 'boolean', price_monthly: 'numeric', price_annual: 'numeric', price_per_employee: 'numeric', price_compare: 'numeric', created_at: 'timestamptz' },
   subscriptions: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'sub_status', trial_ends_at: 'timestamptz', current_period_end: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
-  payments: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'pay_status', dev_mode: 'boolean', refunded_at: 'timestamptz', created_at: 'timestamptz', expires_at: 'timestamptz', paid_at: 'timestamptz' },
+  payments: { barbershop_id: 'uuid', plan_id: 'uuid', status: 'pay_status', dev_mode: 'boolean', billing_period: 'int', installments: 'int', metodo: 'string', refunded_at: 'timestamptz', created_at: 'timestamptz', expires_at: 'timestamptz', paid_at: 'timestamptz' },
   appointments: { barbershop_id: 'uuid', client_id: 'uuid', professional_id: 'uuid', user_id: 'uuid', status: 'ag_status', origin: 'ag_origin', price_total: 'numeric', starts_at: 'timestamptz', ends_at: 'timestamptz', lembrete_email_em: 'timestamptz', lembrete_dia_email_em: 'timestamptz', created_at: 'timestamptz', updated_at: 'timestamptz' },
   appointment_services: { appointment_id: 'uuid', service_id: 'uuid', price_snapshot: 'numeric' },
   reviews: { barbershop_id: 'uuid', user_id: 'uuid', rating: 'int', created_at: 'timestamptz' },

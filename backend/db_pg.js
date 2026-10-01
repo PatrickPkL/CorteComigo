@@ -261,6 +261,18 @@ async function planoPorNome(nome) {
   return knex('plans').where('name', nome).first();
 }
 
+/* Lê uma configuração global do painel do super-admin.
+   platform_settings.chave -> valor (jsonb). */
+async function settingValor(chave, padrao) {
+  try {
+    const r = await knex('platform_settings').where('chave', chave).first();
+    if (!r) return padrao;
+    return r.valor === null || r.valor === undefined ? padrao : r.valor;
+  } catch (e) {
+    return padrao;
+  }
+}
+
 /* ---------------- provisionamento do dono (RF-005) ---------------- */
 
 async function slugUnico(nome) {
@@ -281,7 +293,17 @@ async function provisionarSalao(usuario, nomeSalao) {
   const now = new Date();
   const phoneDig = normalizarTelefone(usuario.phone);
   const planoSalao = await planoPorNome('Salao');
-  const expira = new Date(Date.now() + 10 * 24 * 3600 * 1000);
+  /* [SEGURANÇA] O trial de boas-vindas nasce aqui. Precisa gravar
+     trial_usado=true — sem isso o DEFAULT FALSE da coluna deixava a
+     assinatura com trial_usado=false, e assinarComTrial (que só checa
+     essa flag) concedia 10 dias novos todas as vezes que o trial
+     expirava. Respeita também a configuração trial_10dias do painel. */
+  const cfg = await settingValor('trial_10dias', true);
+  const diasTrial = Number(cfg && cfg.dias) > 0 ? Number(cfg.dias) : 10;
+  const trialLiberado = cfg ? cfg.ativo !== false : true;
+  const expira = trialLiberado
+    ? new Date(Date.now() + diasTrial * 24 * 3600 * 1000)
+    : null;
 
   await asAdmin(async trx => {
     await trx('barbershops').insert({
@@ -321,13 +343,27 @@ async function provisionarSalao(usuario, nomeSalao) {
         created_at: now, updated_at: now
       });
     }
-    // assinatura trial do plano Salao por 10 dias
-    await trx('subscriptions').insert({
-      id: crypto.randomUUID(), barbershop_id: lojaId,
-      plan_id: planoSalao ? planoSalao.id : null,
-      status: 'trial', trial_ends_at: expira, current_period_end: expira,
-      created_at: now, updated_at: now
-    });
+    // assinatura trial do plano Salao — trial_usado gravado para impedir
+    // que assinarComTrial conceda um segundo trial quando este expirar
+    if (trialLiberado) {
+      await trx('subscriptions').insert({
+        id: crypto.randomUUID(), barbershop_id: lojaId,
+        plan_id: planoSalao ? planoSalao.id : null,
+        status: 'trial', trial_ends_at: expira, current_period_end: expira,
+        trial_usado: true,
+        created_at: now, updated_at: now
+      });
+    } else {
+      /* Trial desligado no painel: a loja nasce no plano Free. */
+      const planoFree = await trx('plans').where('is_free', true).first();
+      await trx('subscriptions').insert({
+        id: crypto.randomUUID(), barbershop_id: lojaId,
+        plan_id: planoFree ? planoFree.id : (planoSalao ? planoSalao.id : null),
+        status: 'expirada', trial_ends_at: null, current_period_end: null,
+        trial_usado: true,
+        created_at: now, updated_at: now
+      });
+    }
   });
 
   return lojaPublica(await asAdmin(trx => trx('barbershops').where('id', lojaId).first()));
@@ -361,7 +397,7 @@ module.exports = {
   // magic tokens
   listarMagicTokens, ativosMagicTokens, removerMagicTokens, criarMagicToken,
   // salão
-  salaoDoUsuario, planoPorNome, slugUnico, provisionarSalao,
+  salaoDoUsuario, planoPorNome, settingValor, slugUnico, provisionarSalao,
   // audit
   auditLog
 };

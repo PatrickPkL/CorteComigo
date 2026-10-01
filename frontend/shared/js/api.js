@@ -247,6 +247,34 @@
       if (l) localStorage.setItem(KEY_LOJA, JSON.stringify(l));
     },
 
-    publicUser(u) { return u || null; }
+    publicUser(u) { return u || null; },
+
+    /* validação de força da senha (espelho do backend) */
+    validarForcaSenha(senha) {
+      const s = String(senha || '');
+      const erros = [];
+      if (s.length < 8) erros.push('Mínimo 8 caracteres');
+      if (s.length > 12) erros.push('Máximo 12 caracteres');
+      if (!/[A-Z]/.test(s)) erros.push('Pelo menos 1 maiúscula');
+      if (!/[a-z]/.test(s)) erros.push('Pelo menos 1 minúscula');
+      if (!/[0-9]/.test(s)) erros.push('Pelo menos 1 número');
+      if (!/[^A-Za-z0-9]/.test(s)) erros.push('Pelo menos 1 especial (* @ # $ %)');
+      return { ok: erros.length === 0, erros };
+    },
+
+    /* alterar senha (logado) */
+    alterarSenha(senhaAtual, novaSenha, confirmarSenha) {
+      return rpc('alterarSenha', [senhaAtual, novaSenha, confirmarSenha]);
+    },
+
+    /* solicitar redefinição de senha (link por e-mail) */
+    solicitarRedefinicaoSenha(email) {
+      return rpc('solicitarRedefinicaoSenha', [email]);
+    },
+
+    /* redefinir senha via token */
+    redefinirSenha(token, novaSenha, confirmarSenha) {
+      return rpc('redefinirSenha', [token, novaSenha, confirmarSenha]);
+    }
   };
 })();

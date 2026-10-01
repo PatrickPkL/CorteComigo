@@ -88,37 +88,101 @@
   <div class="service-list-public" id="lista-servicos-publica"></div>
 
   <div id="modal-agendar-cliente" class="modal-overlay" style="display:none;">
-    <div class="card" style="width:480px; max-height:90vh; overflow-y:auto;">
-      <h3 class="section-title">Confirmar agendamento</h3>
-      <form id="form-agendar-cliente">
-        <div class="field">
-          <label>Serviço</label>
-          <div id="ag-resumo" hidden style="font-size:14px;"></div>
+    <div class="card booking-modal" style="width:100%; max-width:520px; max-height:95vh; overflow-y:auto;">
+      <!-- Stepper header -->
+      <div class="booking-stepper" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1">
+        <div class="stepper-track"></div>
+        <div class="stepper-step active" data-step="1" aria-current="step">
+          <span class="stepper-circle">1</span>
+          <span class="stepper-label">Serviço</span>
         </div>
-        <div class="field" id="field-datas" style="display:none;">
-          <label>Escolha a data</label>
-          <div class="slot-dates" id="slot-dates"></div>
+        <div class="stepper-step" data-step="2">
+          <span class="stepper-circle">2</span>
+          <span class="stepper-label">Data</span>
         </div>
-        <div class="field" id="field-horarios" style="display:none;">
-          <label>Horários disponíveis <small style="font-weight:400;">(toque para selecionar)</small></label>
-          <div class="slot-times" id="slot-times"></div>
-          <p id="slot-faixas" style="color:var(--text-muted); font-size:12.5px; margin:8px 0 0;"></p>
-          <label for="ac-horario-livre" style="margin-top:12px;">Ou escolha outro horário</label>
-          <input type="time" id="ac-horario-livre" style="width:130px;">
-          <p id="ac-horario-livre-status" style="font-size:12.5px; color:var(--text-muted); margin:6px 0 0;"></p>
-          <p id="prof-info" style="color:var(--brass); font-size:13.5px; margin-top:8px;"></p>
+        <div class="stepper-step" data-step="3">
+          <span class="stepper-circle">3</span>
+          <span class="stepper-label">Horário</span>
         </div>
-        <div class="field" id="field-dados" style="display:none;">
-          <label for="ac-nome">Seu nome</label>
-          <input type="text" id="ac-nome" name="nome" required>
+        <div class="stepper-step" data-step="4">
+          <span class="stepper-circle">4</span>
+          <span class="stepper-label">Confirma</span>
         </div>
-        <div class="field" id="field-telefone" style="display:none;">
-          <label for="ac-telefone">Telefone</label>
-          <input type="tel" id="ac-telefone" name="telefone" placeholder="(00) 00000-0000" required>
+      </div>
+
+      <form id="form-agendar-cliente" novalidate>
+        <!-- Step 1: Serviço (already chosen, just show summary) -->
+        <div class="booking-step active" data-step="1" role="step" aria-labelledby="step1-title">
+          <h4 id="step1-title" class="step-title">Serviço selecionado</h4>
+          <div id="ag-resumo" class="service-summary-card"></div>
+          <div class="step-actions">
+            <button type="button" class="btn btn-outline btn-back-step" data-to="0">Voltar</button>
+            <button type="button" class="btn btn-brass btn-next-step" data-to="2" id="btn-step1-next" disabled>Continuar</button>
+          </div>
         </div>
-        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
-          <button type="button" class="btn btn-outline" id="btn-fechar-modal-agendar">Cancelar</button>
-          <button type="submit" class="btn btn-brass" id="btn-confirmar-agendamento" disabled>Confirmar agendamento</button>
+
+        <!-- Step 2: Calendar picker -->
+        <div class="booking-step" data-step="2" role="step" aria-labelledby="step2-title" hidden>
+          <h4 id="step2-title" class="step-title">Escolha a data</h4>
+          <p class="step-hint">Datas com horários livres nos próximos 30 dias</p>
+          <div class="calendar-wrapper">
+            <div class="calendar-header">
+              <button type="button" class="cal-nav" id="cal-prev" aria-label="Mês anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <div id="cal-month-year" class="cal-title"></div>
+              <button type="button" class="cal-nav" id="cal-next" aria-label="Próximo mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Calendário de disponibilidade"></div>
+            <div class="calendar-legend">
+              <span class="cal-leg-item"><span class="cal-leg-dot available"></span> Disponível</span>
+              <span class="cal-leg-item"><span class="cal-leg-dot selected"></span> Selecionado</span>
+              <span class="cal-leg-item"><span class="cal-leg-dot past"></span> Passado</span>
+              <span class="cal-leg-item"><span class="cal-leg-dot full"></span> Lotado</span>
+            </div>
+          </div>
+          <div class="step-actions">
+            <button type="button" class="btn btn-outline btn-back-step" data-to="1">Voltar</button>
+            <button type="button" class="btn btn-brass btn-next-step" data-to="3" id="btn-step2-next" disabled>Continuar</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Time slots grouped by period -->
+        <div class="booking-step" data-step="3" role="step" aria-labelledby="step3-title" hidden>
+          <h4 id="step3-title" class="step-title">Escolha o horário</h4>
+          <p class="step-hint" id="step3-hint">Horários livres para <strong id="chosen-date-label"></strong></p>
+          <div class="time-periods" id="time-periods"></div>
+          <div class="custom-time-field" id="custom-time-field" hidden>
+            <label for="ac-horario-livre">Ou digite outro horário</label>
+            <div class="custom-time-input">
+              <input type="time" id="ac-horario-livre" step="900" aria-label="Horário personalizado">
+              <span id="ac-horario-livre-status" class="custom-time-status"></span>
+            </div>
+          </div>
+          <div class="step-actions">
+            <button type="button" class="btn btn-outline btn-back-step" data-to="2">Voltar</button>
+            <button type="button" class="btn btn-brass btn-next-step" data-to="4" id="btn-step3-next" disabled>Continuar</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Review & Confirm -->
+        <div class="booking-step" data-step="4" role="step" aria-labelledby="step4-title" hidden>
+          <h4 id="step4-title" class="step-title">Revise seu agendamento</h4>
+          <div class="booking-summary" id="booking-summary"></div>
+          <div class="field" id="field-dados" hidden>
+            <label for="ac-nome">Seu nome <span class="required">*</span></label>
+            <input type="text" id="ac-nome" name="nome" required autocomplete="name">
+          </div>
+          <div class="field" id="field-telefone" hidden>
+            <label for="ac-telefone">Telefone <span class="required">*</span></label>
+            <input type="tel" id="ac-telefone" name="telefone" placeholder="(00) 00000-0000" required autocomplete="tel">
+          </div>
+          <p class="login-hint" id="login-hint" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Você será direcionado para login antes da confirmação final.</span>
+          </p>
+          <div class="step-actions">
+            <button type="button" class="btn btn-outline btn-back-step" data-to="3">Voltar</button>
+            <button type="submit" class="btn btn-brass" id="btn-confirmar-agendamento" disabled>Confirmar agendamento</button>
+          </div>
         </div>
       </form>
     </div>

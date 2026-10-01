@@ -114,3 +114,29 @@ body[data-page="login"] .btn-back {
 @media (max-width: 900px) {
   .login-visual { display: none; }
 }
+
+/* password visibility toggle */
+.password-wrapper {
+  position: relative;
+}
+.password-wrapper input {
+  padding-right: 48px !important;
+}
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.password-toggle:hover { color: var(--text); }
+.password-toggle:focus { outline: none; }
+.password-toggle:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; border-radius: 4px; }

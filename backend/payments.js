@@ -38,6 +38,38 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     return String(process.env.ABACATEPAY_API_KEY || '').trim();
   }
 
+  /* [SEGURANÇA] Ambiente de produção. Sem isto, um erro de deploy
+     (NODE_ENV não definido no hPanel) deixaria a cobrança demo — que não
+     move dinheiro — valendo como pagamento real. */
+  function ambienteProducao() {
+    return String(process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+  }
+
+  /* Simulação só fora de produção E com opt-in explícito, para não
+     carregar um botão de "pagar" em ambiente que alguém publicou. */
+  function simulacaoLiberada() {
+    if (ambienteProducao()) return false;
+    const flag = String(process.env.CC_PAGAMENTO_SIMULADO || '').trim().toLowerCase();
+    if (flag === '1' || flag === 'true') return true;
+    /* Fora de produção, sem NODE_ENV definido, a simulação segue liberada
+       (ambiente de dev); com NODE_ENV explícito de staging, exige opt-in. */
+    return !String(process.env.NODE_ENV || '').trim();
+  }
+
+  /* Cobrança real exige chave da AbacatePay. Sem isso, falhar alto em vez
+     de gerar cobrança demo silenciosamente. */
+  function exigirChaveParaCobrancaReal() {
+    if (chaveApi()) return true;
+    if (ambienteProducao() || !simulacaoLiberada()) {
+      throw {
+        status: 503,
+        code: 'pagamento_indisponivel',
+        error: 'Pagamento online indisponível no momento. Tente novamente mais tarde.'
+      };
+    }
+    return false;
+  }
+
   /* ---------- auth local (exigirDono vive fechado no api.js) ---------- */
 
   function exigirDonoLocal() {
@@ -159,6 +191,10 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     const plano = db.plans.find(p => p.id == planId);
     if (!plano) err400('Plano não encontrado.');
     if (plano.is_free) err400('O plano Free não pode ser assinado — é o plano base gratuito.');
+    /* [SEGURANÇA] Plano desativado pelo super-admin não aceita nova
+       cobrança. Antes `plans.active` era ignorado aqui e a assinatura
+       acontecia mesmo com o plano fora da vitrine. */
+    if (plano.active === false) err400('Este plano não está disponível para contratação no momento.');
 
     const mtd = String(metodo || 'pix').toLowerCase();
     if (mtd !== 'pix') err400('Método de pagamento inválido.');
@@ -170,12 +206,29 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
       : 1;
     /* Preço por período. Anual usa o preço anual próprio do plano
        (price_annual) quando disponível; senão cai para 12× o mensal. */
-    const baseTotal = anual
+    const basePlano = anual
       ? (plano.price_annual != null && Number(plano.price_annual) > 0
           ? Number(plano.price_annual)
           : Number(plano.price_monthly || 0) * 12)
       : Number(plano.price_monthly || 0);
-    const totalCents = Math.round(baseTotal * 100);
+
+    /* price_per_employee é exibido na vitrine mas nunca era cobrado:
+       o Salão anunciava "R$ 10 por profissional" e o PIX vinha só com a
+       mensalidade. Cobramos a diferença entre a cota do plano e o que a
+       loja realmente usa — nunca abaixo de 1, para não cobrar por
+       profissional em loja com equipe vazia. */
+    const porProf = plano.price_per_employee == null ? 0 : Number(plano.price_per_employee) || 0;
+    let extraFuncionarios = 0;
+    if (porProf > 0) {
+      const { plano: planoEfet } = (typeof window.API.planoEfetivo === 'function')
+        ? window.API.planoEfetivo(shopId) : { plano: plano };
+      const inclusos = planoEfet && planoEfet.max_professionals != null
+        ? Math.max(1, Number(planoEfet.max_professionals)) : 1;
+      const emUso = db.professionals.filter(p =>
+        p.barbershop_id === shopId && p.is_active).length;
+      extraFuncionarios = Math.max(0, emUso - inclusos);
+    }
+    const totalCents = Math.round((basePlano + porProf * extraFuncionarios) * 100);
 
     /* pendente reutilizável? */
     const agora = agoraMsISO();
@@ -195,7 +248,7 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
       amount_cents: totalCents,
       metodo: mtd,
       status: 'pending',
-      provider: chaveApi() ? 'abacatepay' : 'demo',
+      provider: exigirChaveParaCobrancaReal() ? 'abacatepay' : 'demo',
       abacate_id: null,
       br_code: '',
       qr_base64: '',
@@ -312,6 +365,22 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
    * Nunca afeta cobranças reais (provider 'abacatepay').
    */
   function confirmarCobrancaDemo(paymentId) {
+    /* [SEGURANÇA] Uma cobrança demo NÃO pode ativar plano pago.
+       Antes bastava faltar ABACATEPAY_API_KEY no .env (erro comum de
+       deploy) para o próprio dono "pagar" e liberar o plano premium.
+       Em produção isso é dinheiro que não entra. */
+    if (ambienteProducao()) {
+      throw {
+        status: 403,
+        error: 'Simulação de pagamento indisponível em produção.'
+      };
+    }
+    if (!simulacaoLiberada()) {
+      throw {
+        status: 403,
+        error: 'Simulação de pagamento desativada. Defina CC_PAGAMENTO_SIMULADO=1 fora de produção para habilitar.'
+      };
+    }
     const { shop } = exigirDonoLocal();
     const pag = DB._d().payments.find(p => p.id == paymentId && p.barbershop_id === shop.id);
     if (!pag) throw { status: 404, error: 'Cobrança não encontrada.' };
@@ -400,7 +469,53 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     /* Revoga os dias que o pagamento devolvido tinha concedido. */
     recalcularPeriodoAposEstorno(shop.id);
 
+    /* Avisa o dono: o estorno é um ato irreversível e muda o acesso dele. */
+    notificarEstorno(shop, pag);
+
     return pagamentoPublico(pag);
+  }
+
+  /** Registra o estorno em notificações e tenta e-mail ao dono. Nunca
+      lança: falha de e-mail não pode desfazer um estorno já confirmado. */
+  function notificarEstorno(shop, pag) {
+    try {
+      const db = DB._d();
+      const valor = (Number(pag.amount_cents || 0) / 100).toFixed(2);
+      const texto = 'O pagamento de R$ ' + valor + ' (plano ' +
+        ((db.plans.find(p => p.id === pag.plan_id) || {}).name || '—') +
+        ') foi estornado. Os dias correspondentes foram removidos do seu acesso.';
+      if (Array.isArray(db.notifications)) {
+        db.notifications.push({
+          id: DB.proximoId(),
+          user_id: (shop && shop.owner_id) || null,
+          barbershop_id: shop ? shop.id : null,
+          type: 'payment',
+          title: 'Estorno processado',
+          message: texto,
+          read: false,
+          created_at: agoraISO()
+        });
+        DB.salvar();
+      }
+      var Mailer;
+      try { require('./mailer'); } catch (e) { return; }
+      const dono = db.users.find(u => u.id === (shop && shop.owner_id));
+      if (dono && dono.email && Mailer && Mailer.enviarEmail) {
+        var esc = function (s) {
+          return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+        Mailer.enviarEmail({
+          to: dono.email,
+          subject: 'Estorno processado — ' + (shop.name || 'seu salão'),
+          html: '<h2>Estorno processado</h2><p>Olá, ' + esc(dono.name || '') + '.</p><p>' +
+            esc(texto) + '</p><p>Se não reconhece esta operação, fale com o suporte.</p>'
+        }).catch(function () {});
+      }
+    } catch (e) {
+      console.error('[estorno] falha ao notificar dono:', e && e.message);
+    }
   }
 
   /**
@@ -429,10 +544,18 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     if (fim) {
       sub.current_period_end = fim;
       sub.plan_id = plano || sub.plan_id;
-      sub.status = 'ativa';
+      /* [SEGURANÇA] NÃO ressuscite uma assinatura cancelada. Antes isto
+         fazia status='ativa' incondicional: o dono cancelava, estornava
+         e voltava a estar ativo. Uma assinatura 'trial' que ainda tem
+         trial vigente também permanece 'trial'. */
+      if (sub.status !== 'cancelada' && sub.status !== 'trial') {
+        sub.status = 'ativa';
+      }
     } else {
+      /* Sem nenhum pagamento válido resta nada a pagar. Se o dono havia
+         cancelado, o cancelamento permanece — só o fim do período some. */
       sub.current_period_end = null;
-      sub.status = 'expirada';
+      if (sub.status !== 'cancelada') sub.status = 'expirada';
     }
     sub.updated_at = agoraISO();
     DB.salvar();
@@ -521,6 +644,21 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     }
     if (PAGOS.includes(tipo)) {
       if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
+      /* [SEGURANÇA] Uma cobrança já estornada não pode ser reativada por
+         um evento de pagamento posterior ou repetido. */
+      if (pag.refunded_at) {
+        console.warn('[webhook] pagamento ja estornado, ativacao ignorada: ' + pag.id);
+        return { ignored: true, motivo: 'cobranca_estornada' };
+      }
+      /* [SEGURANÇA] Confere o valor informado no evento contra o valor
+        cobrado. Divergência indica evento forjado ou recombination. */
+      if (dados.amount != null && pag.amount_cents != null) {
+        const valorCents = Math.round(Number(dados.amount) * 100);
+        if (Number.isFinite(valorCents) && valorCents !== Math.round(Number(pag.amount_cents))) {
+          console.error('[webhook] valor divergente para ' + pag.id + ' — ativacao bloqueada');
+          return { ignored: true, motivo: 'valor_divergente' };
+        }
+      }
       const mudou = aplicarPagamento(pag);
       return { ok: true, payment_db_id: pag.id, applied: mudou };
     }
@@ -554,7 +692,13 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     const plano = sub && db.plans.find(p => p.id === sub.plan_id);
     if (plano && plano.is_free) return true;
     if (!sub) return false;
-    if (sub.status === 'trial') return !!sub.trial_ends_at && sub.trial_ends_at >= hoje;
+    if (sub.status === 'trial') {
+      return !!sub.trial_ends_at && sub.trial_ends_at >= hoje;
+    }
+    if (sub.status === 'cancelada') {
+      return !!sub.current_period_end && sub.current_period_end >= hoje;
+    }
+    if (sub.status !== 'ativa') return false;
     return !!sub.current_period_end && sub.current_period_end >= hoje;
   }
 
