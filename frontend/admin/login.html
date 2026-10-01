@@ -50,9 +50,19 @@
             <label for="cli-email-login">E-mail</label>
             <input type="email" id="cli-email-login" placeholder="seu@email.com" required>
           </div>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+          <div class="field">
+            <label for="cli-senha-login">Senha</label>
+            <div class="password-wrapper">
+              <input type="password" id="cli-senha-login" placeholder="Sua senha" required autocomplete="current-password">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Entrar</button>
           <p style="text-align:center; margin-top:12px; font-size:13.5px;">
-            Esqueceu o acesso? <a href="#" class="recuperar-link" style="color:var(--brass);">Recuperar por e-mail</a>
+            Esqueceu a senha? <a href="#" class="recuperar-link" style="color:var(--brass);">Redefinir por e-mail</a>
           </p>
         </form>
 
@@ -102,9 +112,19 @@
             <label for="dono-tel">Telefone ou e-mail</label>
             <input type="text" id="dono-tel" placeholder="(71) 99999-0000 · voce@email.com" required>
           </div>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Receber código</button>
+          <div class="field">
+            <label for="dono-senha-login">Senha</label>
+            <div class="password-wrapper">
+              <input type="password" id="dono-senha-login" placeholder="Sua senha" required autocomplete="current-password">
+              <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Entrar</button>
           <p style="text-align:center; margin-top:12px; font-size:13.5px;">
-            Esqueceu o acesso? <a href="#" class="recuperar-link" style="color:var(--brass);">Recuperar por e-mail</a>
+            Esqueceu a senha? <a href="#" class="recuperar-link" style="color:var(--brass);">Redefinir por e-mail</a>
           </p>
         </form>
 

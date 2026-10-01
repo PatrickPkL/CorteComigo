@@ -267,6 +267,11 @@
       return rpc('alterarSenha', [senhaAtual, novaSenha, confirmarSenha]);
     },
 
+    /* login tradicional e-mail + senha */
+    loginComSenha(email, senha) {
+      return rpc('loginComSenha', [email, senha]);
+    },
+
     /* solicitar redefinição de senha (link por e-mail) */
     solicitarRedefinicaoSenha(email) {
       return rpc('solicitarRedefinicaoSenha', [email]);

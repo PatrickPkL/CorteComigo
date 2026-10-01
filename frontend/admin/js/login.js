@@ -181,15 +181,40 @@ document.addEventListener('DOMContentLoaded', () => {
     return !!(cb && cb.checked);
   }
 
-  /* entrada */
+  /* entrada — LOGIN tradicional e-mail + senha */
   document.getElementById('form-cli-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
-    pedirCodigo({
-      email: document.getElementById('cli-email-login').value.trim(),
-      modo: 'login'
-    });
+    const email = document.getElementById('cli-email-login').value.trim();
+    const senha = document.getElementById('cli-senha-login')?.value || '';
+    if (!email || !senha) { showToast('Informe e-mail e senha.', 'error'); return; }
+    try {
+      const r = Auth.loginComSenha(email, senha);
+      sessionStorage.removeItem('cc_flash');
+      const primeiro = (r.user && r.user.name ? r.user.name.split(' ')[0] : '');
+      showToast('Bem-vindo' + (primeiro ? ', ' + primeiro : '') + '!');
+      setTimeout(() => { window.location.href = destinoPosLogin(r.user); }, 700);
+    } catch (erro) {
+      showToast(msgErro(erro), 'error');
+    }
   });
 
+  document.getElementById('form-dono-login')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const ident = document.getElementById('dono-tel').value.trim();
+    const senha = document.getElementById('dono-senha-login')?.value || '';
+    if (!ident || !senha) { showToast('Informe e-mail/telefone e senha.', 'error'); return; }
+    try {
+      const r = Auth.loginComSenha(ident, senha);
+      sessionStorage.removeItem('cc_flash');
+      const primeiro = (r.user && r.user.name ? r.user.name.split(' ')[0] : '');
+      showToast('Bem-vindo' + (primeiro ? ', ' + primeiro : '') + '!');
+      setTimeout(() => { window.location.href = destinoPosLogin(r.user); }, 700);
+    } catch (erro) {
+      showToast(msgErro(erro), 'error');
+    }
+  });
+
+  /* CADASTRO — usa código de verificação (mantém fluxo atual) */
   document.getElementById('form-cli-cadastro')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -205,35 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
       name: document.getElementById('cli-nome').value,
       email: document.getElementById('cli-email').value,
       role: 'cliente',
-      senha: senha,
-      aceite_privacidade: consentiu(f)
-    });
-  });
-
-  document.getElementById('form-dono-login')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    pedirCodigo({
-      phone: document.getElementById('dono-tel').value,
-      modo: 'login'
-    });
-  });
-
-  document.getElementById('form-dono-cadastro')?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const f = e.currentTarget;
-    const senha = document.getElementById('cad-senha').value;
-    const validacao = Auth.validarForcaSenha(senha);
-    if (!validacao.ok) {
-      showToast('Senha fraca: ' + validacao.erros.join(', '), 'error');
-      return;
-    }
-    pedirCodigo({
-      phone: document.getElementById('cad-tel').value,
-      modo: 'registro',
-      name: document.getElementById('cad-nome-resp').value,
-      salon_name: document.getElementById('cad-salao-nome').value,
-      email: document.getElementById('cad-email').value,
-      role: 'dono',
       senha: senha,
       aceite_privacidade: consentiu(f)
     });

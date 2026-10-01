@@ -602,6 +602,51 @@ window.Auth = (function () {
   }
 
   /**
+   * Login tradicional com e-mail + senha (cliente/dono).
+   * Usado APÓS o cadastro ter sido verificado com código.
+   */
+  function loginComSenha(email, senha) {
+    if (!email || !senha) {
+      throw { status: 400, error: 'Informe e-mail e senha.' };
+    }
+    const ident = normalizarIdentidade(email);
+    if (!ehEmail(ident)) {
+      throw { status: 400, error: 'Informe um e-mail válido.' };
+    }
+
+    /* rate limiting */
+    const bloqueio = verificarBloqueioLogin(ident);
+    if (bloqueio) {
+      throw { status: 429, error: 'Muitas tentativas. Aguarde ' + bloqueio.minutos + ' min para tentar novamente.' };
+    }
+
+    const db = DB._d();
+    const usuario = usuarioPorIdentidade(db, ident);
+    if (!usuario || usuario.role === 'dependente') {
+      throw { status: 401, error: 'E-mail ou senha incorretos.' };
+    }
+    if (!usuario.password_hash) {
+      throw { status: 400, error: 'Esta conta não possui senha. Use o código de verificação.' };
+    }
+    if (!verificarSenha(senha, usuario.password_hash)) {
+      registrarFalhaLogin(ident);
+      throw { status: 401, error: 'E-mail ou senha incorretos.' };
+    }
+
+    limparFalhasLogin(ident);
+
+    let barbearia = null;
+    if (usuario.role === 'dono' || usuario.role === 'barbeiro') {
+      barbearia = salaoDoUsuario(usuario);
+    }
+
+    criarSessao(usuario.id);
+    _auditLog(usuario.id, 'login_sucesso');
+
+    return { token: localStorage.getItem('token'), user: publicUser(usuario), barbershop: barbearia };
+  }
+
+  /**
    * Alterar senha — exige senha atual + nova + confirmação.
    * Usado pelo usuário logado no painel.
    */
@@ -817,6 +862,7 @@ window.Auth = (function () {
     solicitarRedefinicaoSenha,
     redefinirSenha,
     verifyCode,
+    loginComSenha,
     usuarioAtual,
     publicUser,
     salaoDoUsuario,
