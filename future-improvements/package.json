@@ -1,0 +1,45 @@
+{
+  "name": "cortecerto-workers",
+  "version": "1.0.0",
+  "description": "Background workers for CorteCerto - webhook processing, email delivery, report generation, and reminders",
+  "main": "index.js",
+  "scripts": {
+    "worker:webhook": "node workers/webhook-worker.js",
+    "worker:email": "node workers/email-worker.js",
+    "worker:report": "node workers/report-worker.js",
+    "worker:reminder": "node workers/reminder-worker.js",
+    "worker:all": "concurrently \"npm:worker:webhook\" \"npm:worker:email\" \"npm:worker:report\" \"npm:worker:reminder\"",
+    "dev": "concurrently \"npm:worker:webhook\" \"npm:worker:email\" \"npm:worker:report\" \"npm:worker:reminder\"",
+    "start": "npm run worker:all",
+    "test": "jest --coverage",
+    "lint": "eslint workers/**/*.js"
+  },
+  "keywords": [
+    "workers",
+    "background-jobs",
+    "webhook",
+    "email",
+    "reports",
+    "reminders",
+    "cortecerto"
+  ],
+  "author": "CorteCerto Team",
+  "license": "MIT",
+  "dependencies": {
+    "concurrently": "^8.2.2",
+    "bullmq": "^5.8.0",
+    "ioredis": "^5.3.2",
+    "nodemailer": "^6.9.8",
+    "axios": "^1.6.7",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.56.0",
+    "@types/jest": "^29.5.11"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

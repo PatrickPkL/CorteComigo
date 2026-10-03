@@ -246,6 +246,7 @@ const _RPC_BLOQUEADOS = new Set([
   'saListarDenuncias', 'saResolverDenuncia',
   'saListarPlanos', 'saAtualizarPrecosPlano', 'saCriarPlano', 'saEditarPlano', 'saExcluirPlano',
   'saObterConfig', 'saDefinirSiteGratis', 'saDefinirTrial',
+  'saSituacao', 'saLogs',
   'definirModoTrial'
 ]);
 const _RPC_AUTH_PUBLICOS = new Set([
