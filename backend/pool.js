@@ -11,7 +11,6 @@ const poolConfig = {
     destroyTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
     reapIntervalMillis: 1000,
-    prepareStatement: true,
     propagateCreateError: () => new Error('Failed to create connection'),
   },
   acquireConnectionTimeout: 30000,
