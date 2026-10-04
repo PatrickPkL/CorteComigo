@@ -2,6 +2,10 @@ const { Worker } = require('bullmq');
 const { redis } = require('./queue');
 const nodemailer = require('nodemailer');
 
+/* Worker de e-mail (BullMQ). Só roda com Redis disponível. O envio de
+   e-mail do boot (código de verificação, link mágico, onboarding) NÃO
+   depende deste worker: é feito direto pelo mailer.js. */
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT || 587,
@@ -46,19 +50,19 @@ function renderTemplate(template, data) {
 }
 
 function stripHtml(html) {
-  return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return String(html || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
 }
 
 worker.on('completed', (job) => {
-  console.log([Email] Job  sent to );
+  console.log('[Email] Job enviado para:', job && job.data && job.data.to);
 });
 
 worker.on('failed', (job, err) => {
-  console.error([Email] Job  failed:, err.message);
+  console.error('[Email] Job falhou:', err && err.message);
 });
 
 worker.on('error', (err) => {
-  console.error('[Email] Worker error:', err.message);
+  console.error('[Email] Erro no worker:', err && err.message);
 });
 
 module.exports = worker;

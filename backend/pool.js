@@ -28,4 +28,30 @@ db.on('query-error', (error, query) => {
   console.error('[Knex] Query Error:', error.message, query?.sql);
 });
 
+/* Executa fn dentro de uma transação.
+   Usado por db.js (carga inicial, diff de escrita, purge de sessões) e
+   pelos scripts em scripts/*.js. Precisa existir porque db.js faz
+   `const { asAdmin } = require('./pool')` — sem esta função o boot morria
+   com "asAdmin is not a function" (503).
+   Quando ADMIN_DB_ROLE está definida, escala para esse role dentro da
+   transação (é o role com BYPASSRLS criado em 005_rls.js). Opcional de
+   propósito: se o role não existir no banco, o boot continua funcionando
+   com o usuário dono em vez de morrer. */
+async function asAdmin(fn) {
+  return db.transaction(async (trx) => {
+    const role = String(process.env.ADMIN_DB_ROLE || '').trim();
+    if (role) {
+      await trx.raw('SET LOCAL ROLE ??', [role]);
+    }
+    return fn(trx);
+  });
+}
+
+/* O módulo é usado de três formas no projeto — `require('./pool')` direto
+   (instância do knex), `require('./pool').knex` (api.js, server.js) e
+   `const { knex, asAdmin } = require('./pool')` (db.js, scripts).
+   Exportar a instância com as duas propriedades anexadas satisfaz as três. */
+db.knex = db;
+db.asAdmin = asAdmin;
+
 module.exports = db;

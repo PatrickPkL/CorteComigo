@@ -2,17 +2,32 @@ const { Worker } = require('bullmq');
 const { redis } = require('./queue');
 const crypto = require('crypto');
 
+/* Worker de webhooks (BullMQ). Só roda se houver Redis: a hospedagem
+   compartilhada não tem Redis gerenciado e nada no boot carrega este
+   arquivo — o webhook de PIX é tratado direto por server.js. */
+
+const SEGREDO = () => String(process.env.ABACATEPAY_WEBHOOK_SECRET || '');
+
+/* Comparação em tempo constante: `!` simples vaza informação por
+   timing e rejeitava assinatura válida por erro de codificação. */
+function assinaturaValida(recebido, timestamp, payload) {
+  const segredo = SEGREDO();
+  if (!segredo || !recebido) return false;
+  const esperada = crypto
+    .createHmac('sha256', segredo)
+    .update(`${timestamp}.${JSON.stringify(payload)}`)
+    .digest('hex');
+  const a = Buffer.from(String(recebido), 'utf8');
+  const b = Buffer.from(esperada, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 const worker = new Worker('webhooks', async (job) => {
   const { payload, signature, timestamp } = job.data;
 
-  const secret = process.env.ABACATEPAY_WEBHOOK_SECRET;
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(${timestamp}.)
-    .digest('hex');
-
-  if (signature !== expectedSignature) {
-    throw new Error('Invalid webhook signature');
+  if (!assinaturaValida(signature, timestamp, payload)) {
+    throw new Error('Assinatura de webhook inválida');
   }
 
   switch (payload.event) {
@@ -29,7 +44,7 @@ const worker = new Worker('webhooks', async (job) => {
       await handleSubscriptionCancelled(payload.data);
       break;
     default:
-      console.warn([Webhook] Unhandled event: );
+      console.warn('[Webhook] Evento não tratado:', payload && payload.event);
   }
 
   return { processed: true, event: payload.event };
@@ -43,31 +58,31 @@ const worker = new Worker('webhooks', async (job) => {
 });
 
 async function handlePixPaymentReceived(data) {
-  console.log('[Webhook] PIX payment received:', data.id);
+  console.log('[Webhook] PIX recebido:', data && data.id);
 }
 
 async function handlePixPaymentExpired(data) {
-  console.log('[Webhook] PIX payment expired:', data.id);
+  console.log('[Webhook] PIX expirado:', data && data.id);
 }
 
 async function handleSubscriptionCreated(data) {
-  console.log('[Webhook] Subscription created:', data.id);
+  console.log('[Webhook] Assinatura criada:', data && data.id);
 }
 
 async function handleSubscriptionCancelled(data) {
-  console.log('[Webhook] Subscription cancelled:', data.id);
+  console.log('[Webhook] Assinatura cancelada:', data && data.id);
 }
 
 worker.on('completed', (job) => {
-  console.log([Webhook] Job  completed);
+  console.log('[Webhook] Job concluído:', job && job.id);
 });
 
 worker.on('failed', (job, err) => {
-  console.error([Webhook] Job  failed:, err.message);
+  console.error('[Webhook] Job falhou:', err && err.message);
 });
 
 worker.on('error', (err) => {
-  console.error('[Webhook] Worker error:', err.message);
+  console.error('[Webhook] Erro no worker:', err && err.message);
 });
 
 module.exports = worker;
