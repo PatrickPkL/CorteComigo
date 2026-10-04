@@ -14,6 +14,47 @@ window.API = (function () {
 
   function _db() { return DB._d(); }
 
+  /* Índices por chave para as varreduras aninhadas.
+     O padrão "para cada X, filtre o array inteiro de Y" é O(n·m): o painel
+     super-admin filtra TODOS os agendamentos uma vez por loja e uma vez por
+     usuário, e o job de lembretes filtra appointment_services uma vez por
+     agendamento — com 100k agendamentos isso são centenas de milhões de
+     comparações dentro do event loop, o que trava o servidor inteiro (e
+     expira requisição, virando 503).
+     Aqui o mapa é montado uma vez (O(n)) e cada item resolve em O(1), com
+     resultado idêntico. Nada é guardado entre chamadas, então não existe
+     risco de índice desatualizado. */
+
+  /* grupo -> lista de itens: _idx(db.appointments, 'barbershop_id') */
+  function _idx(arr, chave) {
+    var m = new Map();
+    if (!arr) return m;
+    for (var i = 0; i < arr.length; i++) {
+      var o = arr[i];
+      if (o == null || o[chave] == null) continue;
+      var k = o[chave];
+      var l = m.get(k);
+      if (!l) { l = []; m.set(k, l); }
+      l.push(o);
+    }
+    return m;
+  }
+
+  /* chave -> único item, com a mesma semântica de Array.find
+     (o PRIMEIRO que casa vence, não o último). */
+  function _um(arr, chave) {
+    var m = new Map();
+    if (!arr) return m;
+    for (var i = 0; i < arr.length; i++) {
+      var o = arr[i];
+      if (o == null || o[chave] == null) continue;
+      if (!m.has(o[chave])) m.set(o[chave], o);
+    }
+    return m;
+  }
+
+  function _conta(lista) { return lista ? lista.length : 0; }
+
   function err(status, error) { throw { status, error }; }
 
   function agoraISO() { return new Date().toISOString(); }
@@ -482,18 +523,31 @@ function lojaPublica(l) {
       if (somenteFuturos && DB.hhmmToMin(String(a.starts_at).slice(11, 16)) < agoraMin) return false;
       return true;
     });
+    /* Nada a enviar: não monta índice nenhum (o job roda 2x a cada 30 min
+       mesmo em dias sem agendamento). */
+    if (!ags.length) return 0;
+
+    /* Mapas montados uma vez. Antes, para CADA agendamento, havia um
+       .find em barbershops, um .find em users, um .filter em
+       appointment_services e um .find em professionals — ou seja, o custo
+       crescia com (agendamentos × serviços) e travava o event loop. */
+    const lojasPorId = _um(db.barbershops, 'id');
+    const usersPorId = _um(db.users, 'id');
+    const profsPorId = _um(db.professionals, 'id');
+    const servicosPorAgendamento = _idx(db.appointment_services, 'appointment_id');
+
     var enviados = 0;
     ags.forEach(function(ag) {
-      var loja = (db.barbershops || []).find(function(b) { return b.id === ag.barbershop_id; });
+      var loja = lojasPorId.get(ag.barbershop_id);
       if (!loja) return;
-      var cli = (db.users || []).find(function(u) { return u.id === ag.user_id; });
+      var cli = usersPorId.get(ag.user_id);
       /* link exclusivo para o cliente marcar/ver o salão */
       var linkAgenda = appUrl + '/public/salao-publico.html?id=' + encodeURIComponent(ag.barbershop_id);
       var dados = {
         salaoNome: loja.name,
         servicos: (function() {
-          var itens = (db.appointment_services || []).filter(function(i) { return i.appointment_id === ag.id; });
-          return itens.length ? itens.map(function(i) { return i.name_snapshot || ''; }).join(' + ') : '';
+          var itens = servicosPorAgendamento.get(ag.id);
+          return itens && itens.length ? itens.map(function(i) { return i.name_snapshot || ''; }).join(' + ') : '';
         })(),
         hora: String(ag.starts_at || '').slice(11, 16),
         endereco: loja.address || '',
@@ -509,7 +563,7 @@ function lojaPublica(l) {
           .catch(function() {});
         tentouEnviar = true;
       }
-      var prof = (db.professionals || []).find(function(p) { return p.id === ag.professional_id; });
+      var prof = profsPorId.get(ag.professional_id);
       if (prof && prof.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prof.email)) {
         Mailer.enviarLembrete(prof.email, Object.assign({
           nome: prof.name, isCliente: false
@@ -591,12 +645,27 @@ function lojaPublica(l) {
   }
 
   function saListarLojas() {
+    /* Mapas por chave: antes cada loja filtrava o array inteiro de
+       agendamentos, profissionais e assinaturas, e vice-versa — O(lojas ×
+       agendamentos). Em 300 lojas com 100k agendamentos isso é 30 milhões
+       de comparações por clique no painel. */
+    var usersPorId = _um(_db().users, 'id');
+    var planosPorId = _um(_db().plans, 'id');
+    var subsPorLoja = _idx(_db().subscriptions, 'barbershop_id');
+    var profsPorLoja = _idx(_db().professionals, 'barbershop_id');
+    var agsAtivosPorLoja = new Map();
+    (_db().appointments || []).forEach(function(a) {
+      if (!a.barbershop_id || a.status === 'cancelado') return;
+      agsAtivosPorLoja.set(a.barbershop_id, (agsAtivosPorLoja.get(a.barbershop_id) || 0) + 1);
+    });
+
     var lojas = (_db().barbershops || []).map(function(b) {
-      var owner = (_db().users || []).find(function(u) { return u.id === b.owner_user_id; });
-      var sub = (_db().subscriptions || []).find(function(s) { return s.barbershop_id === b.id; });
-      var planoDb = sub && (_db().plans || []).find(function(p) { return p.id === sub.plan_id; });
-      var profCount = (_db().professionals || []).filter(function(p) { return p.barbershop_id === b.id; }).length;
-      var agCount = (_db().appointments || []).filter(function(a) { return a.barbershop_id === b.id && a.status !== 'cancelado'; }).length;
+      var owner = usersPorId.get(b.owner_user_id);
+      var listaSubs = subsPorLoja.get(b.id);
+      var sub = listaSubs && listaSubs.length ? listaSubs[0] : undefined;
+      var planoDb = sub && planosPorId.get(sub.plan_id);
+      var profCount = _conta(profsPorLoja.get(b.id));
+      var agCount = agsAtivosPorLoja.get(b.id) || 0;
       return {
         id: b.id, name: b.name, city: b.city, uf: b.uf,
         owner_name: owner ? owner.name : '?',
@@ -614,12 +683,23 @@ function lojaPublica(l) {
   }
 
   function saListarUsuarios() {
+    /* Era o pior ponto do projeto: para CADA usuário, um filter em todos os
+       agendamentos e em todas as sessões. Com 2.000 usuários e 100k
+       agendamentos são 200 milhões de comparações — o painel inteiro
+       travava. */
+    var agsPorUsuario = new Map();
+    (_db().appointments || []).forEach(function(a) {
+      if (!a.user_id) return;
+      agsPorUsuario.set(a.user_id, (agsPorUsuario.get(a.user_id) || 0) + 1);
+    });
+    var sessoesPorUsuario = _idx(_db().sessions, 'user_id');
+
     return (_db().users || []).map(function(u) {
-      var agCount = (_db().appointments || []).filter(function(a) { return a.user_id === u.id; }).length;
-      var sessoes = (_db().sessions || []).filter(function(s) { return s.user_id === u.id; }).length;
       return {
         id: u.id, name: u.name, email: u.email, phone: u.phone,
-        role: u.role, agendamentos: agCount, sessoes: sessoes,
+        role: u.role,
+        agendamentos: agsPorUsuario.get(u.id) || 0,
+        sessoes: _conta(sessoesPorUsuario.get(u.id)),
         created_at: u.created_at
       };
     });
@@ -3150,13 +3230,19 @@ id: DB.proximoId(), barbershop_id: shopId, professional_id: profId,
       l.push(a);
     }
 
+    /* Índices para não repetir findIndex dentro do laço dias × lojas
+       (era O(dias × lojas × relatórios)). */
+    const idxRelatorio = new Map();
+    db.relatorios_diarios.forEach(function(r, i) {
+      if (!idxRelatorio.has(r.barbershop_id + '|' + r.data)) idxRelatorio.set(r.barbershop_id + '|' + r.data, i);
+    });
+
     for (const dia of alvos) {
       const diaCorrente = dia === hoje;
       for (const loja of db.barbershops) {
         const chave = loja.id + '|' + dia;
         const lista = porLoja.get(chave) || [];
-        const idx = db.relatorios_diarios.findIndex(r =>
-          r.barbershop_id === loja.id && r.data === dia);
+        const idx = idxRelatorio.has(chave) ? idxRelatorio.get(chave) : -1;
         if (idx >= 0 && !diaCorrente) continue; /* dias passados fechados: mantém o snapshot */
         const faturamento = lista.reduce((s, a) => s + Number(a.price_total || 0), 0);
         const faixas = {};
