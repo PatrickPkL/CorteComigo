@@ -1,8 +1,44 @@
 const knex = require('knex');
 
+/* ============================================================
+   SSL do banco.
+
+   O commit 4105be8 ("500+ scaling") sobrescreveu este arquivo e
+   perdeu o parse da URL, Together with the `ssl` setting. Resultado:
+   o pg interpretava "sslmode=require" na URL como verify-full,
+   exigia certificado válido e o boot morria com
+
+       self signed certificate in certificate chain
+
+   É o que acontece com host gerenciado (Hostinger/Neon/Render), que
+   usa certificado self-signed. Restaurado do commit 5ee6e4b.
+
+   Parsear a URL aqui também evita depender da versão de
+   pg-connection-string instalada no servidor.
+
+   A conexão continua SEMPRE criptografada (TLS). O que não fazemos
+   por padrão é validar a cadeia contra uma CA confiável, porque o
+   certificado do host não é emitted por uma. Para exigir validação
+   estrita, defina PGSSL_STRICT=1 e aponte para um CA confiável.
+   ============================================================ */
+const _url = process.env.DATABASE_URL;
+const _temSsl = _url && /(ssl=true|sslmode)/i.test(_url);
+let _conn = _url;
+if (_temSsl) {
+  const _p = new URL(_url);
+  _conn = {
+    host: _p.hostname,
+    port: Number(_p.port || 5432),
+    database: (_p.pathname || '').replace(/^\//, ''),
+    user: decodeURIComponent(_p.username || ''),
+    password: decodeURIComponent(_p.password || ''),
+    ssl: { rejectUnauthorized: process.env.PGSSL_STRICT === '1' }
+  };
+}
+
 const poolConfig = {
   client: 'pg',
-  connection: process.env.DATABASE_URL,
+  connection: _conn,
   pool: {
     min: 2,
     max: 50,
