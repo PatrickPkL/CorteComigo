@@ -32,6 +32,7 @@ window.DB = (function () {
   var db = null;              // working copy (memória)
   var _orig = {};             // snapshot por coleção (detecção de mudanças)
   var _queue = Promise.resolve();
+  var _syncPendente = false;  // agrupa vários salvar() num único syncAll
   var _versoes = {};          // versão por coleção (invalida índices de memória)
 
   /* ---------------- helpers de data (hora local, mata DT-11) ---------------- */
@@ -104,7 +105,18 @@ window.DB = (function () {
   }
 
   function _scheduleSync() {
-    _queue = _queue.then(() => syncAll()).catch(e => {
+    /* Várias chamadas a salvar() viram UM único syncAll. O diff é por estado
+       (compara com _orig), não por evento, então agrupar não perde escrita
+       nenhuma — antes cada chamada enfileirava uma varredura completa das 27
+       coleções, e há 90 call-sites de DB.salvar() no projeto. */
+    if (_syncPendente) return;
+    _syncPendente = true;
+    _queue = _queue.then(async () => {
+      /* Libera a marca ANTES do sync: escritas que ocorrerem durante o sync
+         agendam a próxima passada, em vez de ficarem pendentes sem fila. */
+      _syncPendente = false;
+      await syncAll();
+    }).catch(e => {
       console.error('[db][sync]', e && e.stack ? e.stack : e);
     });
   }
@@ -131,7 +143,22 @@ window.DB = (function () {
     for (const r of (prevRows || [])) {
       if (!curByKey.has(_keyOf(m, r))) removed.push(r);
     }
-    return { upsert, removed };
+    return { upsert, removed, prevByKey };
+  }
+
+  /* Novo snapshot de _orig: só as linhas alteradas são clonadas em profundidade.
+     As demais reaproveitam o objeto do snapshot anterior, que já é uma cópia
+     isolada de conteúdo idêntico. Equivale a _deep(cur), mas custa o que mudou
+     em vez da coleção inteira. */
+  function snapshotCol(m, curRows, prevByKey, upsert) {
+    const mudou = new Set(upsert.map(r => _keyOf(m, r)));
+    const out = new Array(curRows.length);
+    for (let i = 0; i < curRows.length; i++) {
+      const r = curRows[i];
+      const k = _keyOf(m, r);
+      out[i] = mudou.has(k) ? _deep(r) : (prevByKey.get(k) || _deep(r));
+    }
+    return out;
   }
 
   async function syncAll() {
@@ -143,19 +170,19 @@ window.DB = (function () {
     // falhar fica pendente (não atualiza _orig) e retenta no próximo salvar.
     for (const m of pg_map.MAP) {
       const cur = db[m.colecao] || [];
-      const prev = _orig[m.colecao];
-      const prevJson = prev === undefined ? '[]' : JSON.stringify(prev);
-      const curJson = JSON.stringify(cur);
-      if (curJson === prevJson) continue;
-      const snap = _deep(cur);
+      const prev = _orig[m.colecao] || [];
+
       try {
-        // incremental: só as linhas novas/alteradas (upsert) e as removidas
-        const { upsert, removed } = diffCol(m, prev || [], cur);
+        /* O proprio diff e o detector de mudanca. A versao anterior gastava
+           stringify(prev) + stringify(cur) + um _deep da colecao inteira e
+           SO DEPOIS diffia — tres serializacoes para responder a mesma
+           pergunta que diffCol ja responde. */
+        const { upsert, removed, prevByKey } = diffCol(m, prev, cur);
         if (upsert.length || removed.length) {
           await writeCol(m, upsert, removed);
+          _orig[m.colecao] = snapshotCol(m, cur, prevByKey, upsert);
+          _versoes[m.colecao] = (_versoes[m.colecao] || 0) + 1;
         }
-        _orig[m.colecao] = snap;
-        _versoes[m.colecao] = (_versoes[m.colecao] || 0) + 1;
       } catch (e) {
         console.error('[db][sync] falha persistindo coleção "' + m.colecao + '":',
           (e && (e.message || e.code)) || e);
