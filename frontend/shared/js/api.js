@@ -15,6 +15,11 @@
   const KEY_USER = 'user';
   const KEY_LOJA = 'barbershop';
 
+  /* Páginas onde um 401 significa mesmo "a sua sessão morreu". Em páginas
+     públicas (catálogo, salão) 401 é esperado para quem não tem conta e
+     não deve expulsar o visitante da tela. */
+  const EM_PAGINA_PRIVADA = /^\/(painel|agendamentos|clientes|servicos|profissionais|funcionarios|horarios|relatorios|relatorios-unica|assinatura|configuracoes|suporte|perfil|admin)/;
+
   function rpc(metodo, args) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/rpc', false); // síncrono de propósito (ponte)
@@ -46,10 +51,37 @@
       } catch (e) { /* fora de contexto de navegador */ }
       throw { status: 402, code: 'assinatura_necessaria', error: erro };
     }
-    throw {
-      status: xhr.status || (resp && resp.status) || 500,
-      error: (resp && resp.error) || ('Erro ' + xhr.status)
-    };
+    const status = xhr.status || (resp && resp.status) || 500;
+    const erro = (resp && resp.error) || ('Erro ' + xhr.status);
+    /* 401 numa chamada feita COM token guardado = sessão morta (expirou,
+       revogou em outro dispositivo, logout em outro lugar). Sem limpar o
+       cache local o painel continuava "logado" com credencial inválida:
+       o guard deixava passar, toda chamada voltava a dar 401 e o login
+       seguinte não entrava — o usuário ficava preso em "faça login". */
+    if (status === 401 && token && EM_PAGINA_PRIVADA.test(window.location.pathname) &&
+        !/\/(login|redefinir-senha)/.test(window.location.pathname)) {
+      limpar();
+      try {
+        const aqui = window.location.pathname.split('/').pop().replace(/\.html$/, '');
+        sessionStorage.setItem('cc_flash', JSON.stringify({ texto: erro, tipo: 'error' }));
+        window.location.replace('/login?next=' + encodeURIComponent(aqui));
+      } catch (e) { /* fora de contexto de navegador */ }
+    }
+    throw { status: status, error: erro };
+  }
+
+  /* ---------------- sessão local ---------------- */
+  /* Todo caminho que autentica precisa gravar token/user/barbershop.
+     Sem isso o navegador fica com a credencial VELHA: o login respondia
+     200, o painel abria e cada chamada voltava 401 — e, com a sessão
+     expirada, o login com e-mail+senha não entrava nunca. */
+  function gravarSessao(r) {
+    if (!r) return r;
+    if (!r.token) { limpar(); return r; }   // resposta sem token não autenticou
+    localStorage.setItem(KEY_TOKEN, r.token);
+    localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
+    localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
+    return r;
   }
 
   /* ---------------- API: proxy genérico ---------------- */
@@ -143,13 +175,7 @@
   /* ---------------- RPC explícitos (além do Proxy) ---------------- */
 
   API.verificarMagicLink = function (token) {
-    const r = rpc('verificarMagicLink', [token]);
-    if (r && r.token) {
-      localStorage.setItem(KEY_TOKEN, r.token);
-      localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
-      localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
-    }
-    return r;
+    return gravarSessao(rpc('verificarMagicLink', [token]));
   };
   API.gerarLembretesAmanha = function () { return rpc('gerarLembretesAmanha', []); };
   API.lojasProximas = function (dados) { return rpc('lojasProximas', [dados]); };
@@ -157,13 +183,7 @@
   /* Login do funcionário/dependente: além do RPC, grava a sessão
      local (token/user/barbershop) igual ao verifyCode. */
   API.loginDependente = function (dados) {
-    const r = rpc('loginDependente', [dados]);
-    if (r && r.token) {
-      localStorage.setItem(KEY_TOKEN, r.token);
-      localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
-      localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
-    }
-    return r;
+    return gravarSessao(rpc('loginDependente', [dados]));
   };
 
   /* Vincula a conta já logada ao Código Único (dependente/cliente). */
@@ -210,13 +230,7 @@
     },
 
     verifyCode(phone, code) {
-      const r = rpc('verifyCode', [phone, code]);
-      if (r && r.token) {
-        localStorage.setItem(KEY_TOKEN, r.token);
-        localStorage.setItem(KEY_USER, r.user ? JSON.stringify(r.user) : '');
-        localStorage.setItem(KEY_LOJA, r.barbershop ? JSON.stringify(r.barbershop) : '');
-      }
-      return r;
+      return gravarSessao(rpc('verifyCode', [phone, code]));
     },
 
     usuarioAtual() {
@@ -269,12 +283,14 @@
 
     /* login tradicional e-mail + senha */
     loginComSenha(email, senha) {
-      return rpc('loginComSenha', [email, senha]);
+      return gravarSessao(rpc('loginComSenha', [email, senha]));
     },
 
-    /* solicitar redefinição de senha (link por e-mail) */
-    solicitarRedefinicaoSenha(email) {
-      return rpc('solicitarRedefinicaoSenha', [email]);
+    /* solicitar redefinição de senha (link por e-mail). O backend exige
+       e-mail + senha atual: mandar só o e-mail reprovava sempre em
+       "Informe sua senha atual para prosseguir". */
+    solicitarRedefinicaoSenha(email, senhaAtual) {
+      return rpc('solicitarRedefinicaoSenha', [email, senhaAtual]);
     },
 
     /* redefinir senha via token */
