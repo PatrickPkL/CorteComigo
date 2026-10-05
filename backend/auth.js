@@ -55,13 +55,26 @@ window.Auth = (function () {
 
   function ehEmail(ident) { return String(ident || '').includes('@'); }
 
-  function usuarioPorIdentidade(db, ident) {
+function usuarioPorIdentidade(db, ident) {
     if (!ident) return null;
     if (ehEmail(ident)) {
-      return IDX.usuarioPorEmail().get(ident) || null;
+        return IDX.usuarioPorEmail().get(ident) || null;
     }
     return IDX.usuarioPorTelefone().get(ident) || null;
-  }
+}
+
+/* O índice de identidade guarda 1 usuário por e-mail/telefone (o último da
+   lista). Se existirem DUAS contas com a mesma identidade — o caso comum é
+   um cadastro antigo feito por código, sem senha — o login caía na conta
+   errada e respondia "não possui senha". Aqui procuramos a conta que de
+   fato tem senha cadastrada. */
+function usuarioComSenhaPorIdentidade(db, ident) {
+    if (!ident) return null;
+    const chave = ehEmail(ident)
+        ? (u) => String(u.email || '').toLowerCase()
+        : (u) => String(u.phone || '').replace(/\D/g, '');
+    return (db.users || []).find(u => u && u.role !== 'dependente' && u.password_hash && chave(u) === ident) || null;
+}
 
   function agoraMs() { return Date.now(); }
 
@@ -622,16 +635,17 @@ window.Auth = (function () {
   }
 
   /**
-   * Login tradicional com e-mail + senha (cliente/dono).
-   * Usado APÓS o cadastro ter sido verificado com código.
+   * Login tradicional com e-mail OU telefone + senha (cliente/dono).
+   * O front manda o que o usuário digitou no campo "e-mail/telefone";
+   * a identidade é normalizada aqui (e-mail em minúsculas ou só dígitos).
    */
-  function loginComSenha(email, senha) {
-    if (!email || !senha) {
-      throw { status: 400, error: 'Informe e-mail e senha.' };
+  function loginComSenha(identidade, senha) {
+    if (!identidade || !senha) {
+      throw { status: 400, error: 'Informe e-mail/telefone e senha.' };
     }
-    const ident = normalizarIdentidade(email);
-    if (!ehEmail(ident)) {
-      throw { status: 400, error: 'Informe um e-mail válido.' };
+    const ident = normalizarIdentidade(identidade);
+    if (!ehEmail(ident) && !/^\d{10,11}$/.test(ident)) {
+      throw { status: 400, error: 'Informe um e-mail ou telefone válido.' };
     }
 
     /* rate limiting */
@@ -641,16 +655,22 @@ window.Auth = (function () {
     }
 
     const db = DB._d();
-    const usuario = usuarioPorIdentidade(db, ident);
-    if (!usuario || usuario.role === 'dependente') {
-      throw { status: 401, error: 'E-mail ou senha incorretos.' };
+    let usuario = usuarioPorIdentidade(db, ident);
+    if (usuario && usuario.role === 'dependente') usuario = null;
+    /* conta sem senha na mesma identidade? tenta a outra que tem */
+    if (usuario && !usuario.password_hash) {
+      const comSenha = usuarioComSenhaPorIdentidade(db, ident);
+      if (comSenha) usuario = comSenha;
+    }
+    if (!usuario) {
+      throw { status: 401, error: 'E-mail/telefone ou senha incorretos.' };
     }
     if (!usuario.password_hash) {
-      throw { status: 400, error: 'Esta conta não possui senha. Use o código de verificação.' };
+      throw { status: 400, error: 'Esta conta não tem senha cadastrada. Entre com código de verificação ou defina uma senha.' };
     }
     if (!verificarSenha(senha, usuario.password_hash)) {
       registrarFalhaLogin(ident);
-      throw { status: 401, error: 'E-mail ou senha incorretos.' };
+      throw { status: 401, error: 'E-mail/telefone ou senha incorretos.' };
     }
 
     limparFalhasLogin(ident);
