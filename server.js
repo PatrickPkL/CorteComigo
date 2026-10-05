@@ -212,6 +212,7 @@ const _authRequired = new Set([
      retornando 401 para quem mais precisa dele. O limite por IP e a
      validação de campos no backend continuam valendo. */
   'meusLogsDeAcesso', 'logoutTodosDispositivos',
+  'alterarSenha',
   'gerarCodigoExclusao', 'confirmarExclusao',
   'alternarFavorito', 'meusFavoritos',
   'criarTicket', 'ticketsDoSalao',
@@ -249,9 +250,15 @@ const _RPC_BLOQUEADOS = new Set([
   'saSituacao', 'saLogs',
   'definirModoTrial'
 ]);
+/* Métodos de Auth (backend/auth.js) que NÃO exigem sessão. */
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
-  'recuperarAcesso', 'logout', 'loginDependente'
+  'recuperarAcesso', 'logout', 'loginComSenha',
+  'solicitarRedefinicaoSenha', 'redefinirSenha'
+]);
+/* Métodos de Auth que EXIGEM sessão válida (também em _authRequired). */
+const _RPC_AUTH_COM_SESSAO = new Set([
+  'alterarSenha'
 ]);
 const _RPC_API = new Set();
 Object.keys(API).forEach(nome => {
@@ -270,6 +277,20 @@ for (const nome of _RPC_API) {
     throw new Error(
       '[SEGURANÇA][BOOT] Método restrito exposto no RPC público: ' + nome +
       '. Adicione-o a _RPC_BLOQUEADOS ou remova da exportação do API.'
+    );
+  }
+}
+
+/* Invariante de segurança (fail-closed): todo método de Auth allowlisted
+   precisa existir de fato em backend/auth.js. Sem isso, um nome errado
+   (ou um método removido do Auth) cai no `fn = null` e responde 401
+   "Sessão expirada" — foi exatamente o que quebrou o login por senha
+   (loginComSenha fora da allowlist). */
+for (const nome of [..._RPC_AUTH_PUBLICOS, ..._RPC_AUTH_COM_SESSAO]) {
+  if (typeof Auth[nome] !== 'function') {
+    throw new Error(
+      '[SEGURANÇA][BOOT] Método de Auth allowlisted não existe: ' + nome +
+      '. Remova da allowlist ou restaure em backend/auth.js.'
     );
   }
 }
@@ -353,7 +374,7 @@ function handleRpc(req, res) {
     let fn = null;
     if (_RPC_API.has(metodo) && typeof API[metodo] === 'function') {
       fn = API[metodo];
-    } else if (_RPC_AUTH_PUBLICOS.has(metodo) && typeof Auth[metodo] === 'function') {
+    } else if ((_RPC_AUTH_PUBLICOS.has(metodo) || _RPC_AUTH_COM_SESSAO.has(metodo)) && typeof Auth[metodo] === 'function') {
       fn = Auth[metodo];
     } else if (_RPC_BOT.has(metodo) && typeof Bot[metodo] === 'function') {
       fn = Bot[metodo];
@@ -961,7 +982,17 @@ function servirEstatico(req, res, url) {
 
   let arquivo = alvo;
   try {
-    if (fs.statSync(alvo).isDirectory()) arquivo = path.join(alvo, 'index.html');
+    if (fs.statSync(alvo).isDirectory()) {
+      const index = path.join(alvo, 'index.html');
+      /* Pasta sem index (ex.: /public/, gerado por link relativo em página
+         com <base href="/public/">) vai para a tela inicial em vez de
+         responder um 404 cru no meio do site. */
+      if (!fs.existsSync(index)) {
+        res.writeHead(302, { Location: '/', 'Cache-Control': 'no-store' });
+        return res.end();
+      }
+      arquivo = index;
+    }
   } catch (e) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     return res.end('404 — não encontrado: ' + caminho);

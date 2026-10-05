@@ -669,8 +669,12 @@ window.Auth = (function () {
   /**
    * Alterar senha — exige senha atual + nova + confirmação.
    * Usado pelo usuário logado no painel.
+   * O userId NÃO vem do cliente: é derivado da sessão (RPC já validado
+   * o token em _authRequired). Antes esta função exigia userId como 1º
+   * argumento e o front enviava só as 3 senhas — o usuário caía no
+   * lugar errado e a troca de senha era impossível.
    */
-  function alterarSenha(userId, senhaAtual, novaSenha, confirmarSenha) {
+  function alterarSenha(senhaAtual, novaSenha, confirmarSenha) {
     if (!senhaAtual || !novaSenha || !confirmarSenha) {
       throw { status: 400, error: 'Todos os campos são obrigatórios.' };
     }
@@ -681,6 +685,10 @@ window.Auth = (function () {
     if (senhaAtual === novaSenha) {
       throw { status: 400, error: 'A nova senha deve ser diferente da atual.' };
     }
+
+    const atual = usuarioAtual();
+    if (!atual) throw { status: 401, error: 'Sessão expirada. Faça login novamente.' };
+    const userId = atual.id;
 
     const db = DB._d();
     const usuario = IDX.usuarioPorId().get(userId);
