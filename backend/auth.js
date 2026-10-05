@@ -714,7 +714,7 @@ function usuarioComSenhaPorIdentidade(db, ident) {
     const usuario = IDX.usuarioPorId().get(userId);
     if (!usuario) throw { status: 404, error: 'Usuário não encontrado.' };
     if (!usuario.password_hash) {
-      throw { status: 400, error: 'Esta conta não possui senha definida. Use a recuperação de acesso.' };
+      throw { status: 400, error: 'Esta conta não tem senha cadastrada. Deixe a senha em branco em "Recuperar acesso" para receber um link por e-mail, ou entre com código de verificação.' };
     }
     if (!verificarSenha(senhaAtual, usuario.password_hash)) {
       throw { status: 401, error: 'Senha atual incorreta.' };
@@ -743,12 +743,17 @@ function usuarioComSenhaPorIdentidade(db, ident) {
     }
 
     const usuario = usuarioPorIdentidade(db, ident);
+    if (usuario && usuario.role === 'dependente') usuario = null;
+    if (usuario && !usuario.password_hash) {
+      const comSenha = usuarioComSenhaPorIdentidade(db, ident);
+      if (comSenha) usuario = comSenha;
+    }
     if (!usuario) {
       // anti-enumeração: mesmo erro genérico
       throw { status: 401, error: 'E-mail ou senha incorretos.' };
     }
     if (!usuario.password_hash) {
-      throw { status: 400, error: 'Esta conta não possui senha definida. Use a recuperação de acesso.' };
+      throw { status: 400, error: 'Esta conta não tem senha cadastrada. Deixe a senha em branco em "Recuperar acesso" para receber um link por e-mail, ou entre com código de verificação.' };
     }
     if (!verificarSenha(senhaAtual, usuario.password_hash)) {
       throw { status: 401, error: 'E-mail ou senha incorretos.' };
