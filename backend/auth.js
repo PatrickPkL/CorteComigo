@@ -303,6 +303,7 @@ function usuarioComSenhaPorIdentidade(db, ident) {
    */
   function requestCode(dados) {
     const db = DB._d();
+    let senhaHash = null;   // só no modo 'registro'
 
     /* Identidade: e-mail tem prioridade (login/cadastro por e-mail — RF-002).
        Quando só o campo telefone veio preenchido, normalizamos (aceita e-mail). */
@@ -343,6 +344,16 @@ function usuarioComSenhaPorIdentidade(db, ident) {
       if (role === 'dono' && !String(dados.salon_name || '').trim()) {
         throw { status: 400, error: 'Informe o nome do salão.' };
       }
+      /* A senha é validada e convertida em hash AQUI, no passo 1, e não no
+         verifyCode. O payload do pedido fica ~10 min na tabela sms_codes
+         (que entra no pg_dump de backup), então nunca guardamos a senha em
+         claro: só o hash scrypt, que é o que será gravado em
+         users.password_hash quando o código for confirmado.
+
+         Validar agora também faz o erro de senha fraca aparecer na hora, em
+         vez de o usuário preencher tudo, esperar o e-mail e só então ser
+         rejeitado ao digitar o código. */
+      senhaHash = hashSenha(validarForcaSenha(dados.senha));
     } else {
       throw { status: 400, error: 'Modo inválido (use login ou registro).' };
     }
@@ -397,6 +408,7 @@ function usuarioComSenhaPorIdentidade(db, ident) {
               : (existente ? (existente.phone || '') : ''),
             role: dados.role === 'dono' ? 'dono' : 'cliente',
             salon_name: String(dados.salon_name || '').trim(),
+            senha_hash: senhaHash,
             aceite_privacidade: !!(dados.aceite_privacidade || dados.aceiteTermos || dados.termosAceitos || dados.termsAccepted)
           }
         : { modo: 'login' },
@@ -574,8 +586,12 @@ function usuarioComSenhaPorIdentidade(db, ident) {
       if (p.modo === 'registro' && !p.aceite_privacidade) {
         throw { status: 400, error: 'O aceite da Política de Privacidade e Termos de Uso é obrigatório. Envie o campo aceite_privacidade (ou aceiteTermos) como true no registro.' };
       }
-      if (p.modo === 'registro' && (!p.senha || String(p.senha).length === 0)) {
-        throw { status: 400, error: 'A senha é obrigatória para criar a conta.' };
+      /* O passo 1 (requestCode) já validou a senha e guardou só o hash no
+         payload, então aqui basta exigir que ele exista: é ele que vira
+         users.password_hash e permite o login por senha nos acessos
+         seguintes, sem novo código. */
+      if (p.modo === 'registro' && !p.senha_hash) {
+        throw { status: 400, error: 'Cadastro incompleto: a senha não foi salva. Inicie o cadastro novamente.' };
       }
       // criação no verify (RF-004) — identidade por e-mail ou telefone
       usuario = {
@@ -585,7 +601,7 @@ function usuarioComSenhaPorIdentidade(db, ident) {
         email: p.email || (porEmail ? ident : ''),
         phone: p.phone || (porEmail ? '' : ident),
         verified: 1,
-        password_hash: p.senha ? hashSenha(validarForcaSenha(p.senha)) : null,
+        password_hash: p.senha_hash || null,
         consentimentos: [{ tipo: 'privacidade', data: new Date().toISOString(), versao: '1.0' }],
         created_at: DB.hojeISO() + 'T' + DB.minToHHMM(DB.agoraMinutos()),
         prefs: { notif_email: 'sim', notif_sms: 'não', lembrete: '30' }
