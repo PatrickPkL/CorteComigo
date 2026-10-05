@@ -214,7 +214,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  /* CADASTRO — usa código de verificação (mantém fluxo atual) */
+  /* CADASTRO DO CLIENTE — passo 1 pede o código por e-mail; o passo 2
+     (form-verificar-codigo) confirma, cria a conta com a senha e já entra.
+     Nos acessos seguintes basta e-mail + senha (Auth.loginComSenha). */
   document.getElementById('form-cli-cadastro')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -230,6 +232,30 @@ document.addEventListener('DOMContentLoaded', () => {
       name: document.getElementById('cli-nome').value,
       email: document.getElementById('cli-email').value,
       role: 'cliente',
+      senha: senha,
+      aceite_privacidade: consentiu(f)
+    });
+  });
+
+  /* CADASTRO DO DONO — mesmo fluxo, role 'dono'. Sem este listener o form
+     #form-dono-cadastro (login.html) dava submit nativo e recarregava a
+     página, sem pedir nada ao servidor. */
+  document.getElementById('form-dono-cadastro')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const f = e.currentTarget;
+    const senha = document.getElementById('cad-senha').value;
+    const validacao = Auth.validarForcaSenha(senha);
+    if (!validacao.ok) {
+      showToast('Senha fraca: ' + validacao.erros.join(', '), 'error');
+      return;
+    }
+    pedirCodigo({
+      phone: document.getElementById('cad-tel').value,
+      modo: 'registro',
+      name: document.getElementById('cad-nome-resp').value,
+      email: document.getElementById('cad-email').value,
+      role: 'dono',
+      salon_name: document.getElementById('cad-salao-nome').value,
       senha: senha,
       aceite_privacidade: consentiu(f)
     });
