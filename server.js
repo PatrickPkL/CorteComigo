@@ -85,6 +85,36 @@ const { API, Auth, Bot } = MODULOS_BOOT;
 const PORTA = Number(process.env.PORT || 3000);
 const RAIZ = path.join(__dirname, 'frontend');
 
+/* Rótulo do build no ar (ver /api/versao e o rodapé da tela de login). */
+const VERSAO_BUILD = (() => {
+  let deploy = null;
+  try { deploy = fs.statSync(__filename).mtime.toISOString(); } catch (e) { /* sem mtime */ }
+  const carimbo = { deploy };
+  try {
+    if (process.env.VERSAO_BUILD) {
+      carimbo.versao = String(process.env.VERSAO_BUILD).slice(0, 40);
+      return carimbo;
+    }
+    const head = fs.readFileSync(path.join(__dirname, '.git', 'HEAD'), 'utf8').trim();
+    const m = head.match(/^ref:\s*(refs\/heads\/.+)$/);
+    if (m) {
+      carimbo.branch = m[1].replace('refs/heads/', '');
+      try {
+        carimbo.versao = fs.readFileSync(path.join(__dirname, '.git', m[1]), 'utf8').trim().slice(0, 7);
+      } catch (e) {
+        /* ref pode estar compactada em .git/packed-refs */
+        const packed = fs.readFileSync(path.join(__dirname, '.git', 'packed-refs'), 'utf8');
+        const linha = packed.split(/\r?\n/).find(l => l.endsWith(' ' + m[1]));
+        if (linha) carimbo.versao = linha.split(' ')[0].slice(0, 7);
+      }
+    } else {
+      carimbo.versao = head.slice(0, 7);
+    }
+  } catch (e) { /* .git não publicado no hosting */ }
+  if (!carimbo.versao) carimbo.versao = 'sem-git';
+  return carimbo;
+})();
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -1044,6 +1074,14 @@ const server = http.createServer((req, res) => {
       json(res, ok ? 200 : 503, { ok });
     })();
   }
+  /* Identifica qual build esta no ar — a tela de login mostra isso para
+     confirmar, em 1 segundo, se o redeploy realmente subiu o código novo.
+     Ordem: VERSAO_BUILD (hosting nem sempre publica o .git) -> .git/HEAD
+     -> data do deploy (mtime de server.js). */
+  if (req.method === 'GET' && pathname === '/api/versao') {
+    return json(res, 200, VERSAO_BUILD, { 'Cache-Control': 'no-store' });
+  }
+
   /* magic-link */
   if (req.method === 'GET' && url.pathname === '/magic-link') {
     const tk = url.searchParams.get('token');

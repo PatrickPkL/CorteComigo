@@ -369,23 +369,16 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const email = document.getElementById('input-rec-email').value.trim();
     const senha = document.getElementById('input-rec-senha').value;
-    if (!email) {
-      showToast('Informe o e-mail cadastrado.', 'error');
+    if (!email || !senha) {
+      showToast('Preencha e-mail e senha atual.', 'error');
       return;
     }
     try {
-      /* Sem senha (ou conta que nunca teve senha): link de acesso direto,
-         que não exige credencial. Com senha: só reenvia o link se ela
-         conferir, evitando enumeração de contas. */
-      const r = senha
-        ? API.solicitarRedefinicaoSenha(email, senha)
-        : API.recuperarAcesso(email);
+      const r = API.solicitarRedefinicaoSenha(email, senha);
       if (r && r.enviado === false) {
         showToast(r.aviso || 'Não foi possível enviar o e-mail (SMTP não configurado).', 'warning');
       } else {
-        showToast(senha
-          ? 'Link de redefinição enviado para seu e-mail.'
-          : 'Link de acesso enviado para seu e-mail.', 'success');
+        showToast('Link de redefinição enviado para seu e-mail.', 'success');
       }
       formRecuperar.reset();
       btnVoltarRec?.click();
