@@ -482,10 +482,11 @@ function usuarioComSenhaPorIdentidade(db, ident) {
   var RECOVER_COOLDOWN_MS = 30 * 1000;
 
   /**
-   * Recuperação de acesso ("esqueci minha senha").
-   * Envia por e-mail (Gmail via Mailer) um link mágico que entra
-   * na conta direto — o app é sem senha (telefone + código).
-   * Não revela se o e-mail está cadastrado (anti-enumeração).
+   * Recuperação de acesso ("esqueci minha senha") — por código de 6 dígitos.
+   * Envia por e-mail (Gmail via Mailer) um código que, verificado por
+   * verifyCode(), abre a sessão. O acesso de dono/cliente é sem senha
+   * (e-mail/telefone + código), então não há senha a redefinir: o código
+   * devolve o acesso. Não revela se o e-mail está cadastrado (anti-enumeração).
    */
   function recuperarAcesso(email) {
     const db = DB._d();
@@ -503,36 +504,39 @@ function usuarioComSenhaPorIdentidade(db, ident) {
     _recoverCooldown.set(ident, agora);
 
     const usuario = usuarioPorIdentidade(db, ident);
+    /* anti-enumeração: e-mail não cadastrado responde igual, mas não envia */
     if (!usuario) return { ok: true, expires_in_seconds: 900 };
 
-    /* limpa tokens mágicos anteriores do usuário (sem stack) e insere um novo */
-    db.magic_tokens = (db.magic_tokens || []).filter(t => t.user_id !== usuario.id);
-    const token = require('crypto').randomBytes(32).toString('hex');
-    const expira = new Date(agora + 15 * 60 * 1000);
-    db.magic_tokens.push({
+    /* Honestidade: sem SMTP o código não sai — avisa em vez de fingir envio */
+    if (!Mailer.temEmailReal()) {
+      return {
+        ok: true, expires_in_seconds: 900, enviado: false,
+        aviso: 'Não foi possível enviar o e-mail de recuperação (SMTP não configurado). O código não foi entregue.'
+      };
+    }
+
+    /* novo pedido substitui o código anterior da mesma identidade */
+    db.sms_codes = (db.sms_codes || []).filter(c => c.ident !== ident);
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    db.sms_codes.push({
       id: DB.proximoId(),
-      token: token,
-      user_id: usuario.id,
-      email: ident,
-      expires_at: expira.toISOString(),
+      ident,
+      phone: String(usuario.phone || '').replace(/\D/g, ''),
+      code,
+      expires_at: agora + CODIGO_TTL_MS,
+      attempts: 0,
       used: 0,
+      next_allowed_at: agora + COOLDOWN_MS,
+      payload: { modo: 'recuperacao' },
       created_at: new Date(agora).toISOString()
     });
     DB.salvar();
+    console.info('[Auth] Código de recuperação gerado para ' + ident + '.');
 
-    let enviado = false;
-    try {
-      const p = Mailer.enviarRecuperacao(ident, token, usuario.name);
-      if (p && typeof p.then === 'function') p.then(function () { enviado = true; }).catch(function (e) { console.error('[auth][recuperacao] falha:', e); });
-      else enviado = true;
-    } catch (e) { console.error('[auth][recuperacao] indisponivel:', e); }
+    Mailer.enviarCodigoRecuperacao(ident, code, usuario.name)
+      .catch(function(e) { console.error('[auth][recuperacao] falha:', e); });
 
-    /* Honestidade: se não há SMTP, avisa. O usuário sem e-mail funcional
-       fica sabendo que o código não saiu — em vez de achar que vai chegar. */
-    if (!enviado) {
-      return { ok: true, expires_in_seconds: 900, enviado: false, aviso: 'Não foi possível enviar o e-mail de recuperação (SMTP não configurado). O código não foi entregue.' };
-    }
-    return { ok: true, expires_in_seconds: 900, enviado: true };
+    return { ok: true, expires_in_seconds: 600, cooldown_seconds: COOLDOWN_MS / 1000, enviado: true };
   }
 
   /**

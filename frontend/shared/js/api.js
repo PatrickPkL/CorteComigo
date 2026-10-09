@@ -229,6 +229,11 @@
       return rpc('reenviarCodigoIdentidade', [dados]);
     },
 
+    /* recuperação de acesso: envia código de 6 dígitos ao e-mail (sem senha) */
+    recuperarAcesso(email) {
+      return rpc('recuperarAcesso', [email]);
+    },
+
     verifyCode(phone, code) {
       return gravarSessao(rpc('verifyCode', [phone, code]));
     },

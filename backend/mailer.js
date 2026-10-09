@@ -276,6 +276,23 @@ function enviarRecuperacao(email, token, nome) {
   }, "recuperar-acesso");
 }
 
+function enviarCodigoRecuperacao(email, codigo, nome) {
+  var conteudo =
+    '<p style="color:#333333;font-size:16px;margin:0 0 16px 0;">Olá' + (nome ? ", " + nome : "") + "!</p>" +
+    '<p style="color:#555555;font-size:14px;margin:0 0 24px 0;">Recebemos um pedido para recuperar o acesso à sua conta no Corte Comigo. Use o código abaixo para entrar:</p>' +
+    '<div style="text-align:center;background-color:#f9f9f9;border-radius:8px;padding:24px;margin:16px 0;">' +
+      '<span style="display:inline-block;color:#b8863b;font-size:40px;font-weight:800;letter-spacing:10px;font-family:monospace;">' + String(codigo) + "</span>" +
+    "</div>" +
+    '<p style="color:#999999;font-size:12px;margin:16px 0 0 0;text-align:center;">Este código expira em 10 minutos. Se você não pediu isso, ignore este e-mail.</p>';
+
+  return enviarEmailComTimeout({
+    from: FROM_NAME + " <" + GMAIL_USER + ">",
+    to: email,
+    subject: "Código para recuperar o acesso — Corte Comigo",
+    html: cabecalhoHTML() + containerHTML(conteudo) + rodapeHTML()
+  }, "recuperar-acesso");
+}
+
 function enviarRedefinicaoSenha(email, token, nome) {
   var link = APP_URL + "/admin/redefinir-senha.html?token=" + token;
 
@@ -464,6 +481,7 @@ module.exports = {
   enviarCodigoExclusao: enviarCodigoExclusao,
   temEmailReal: temEmailReal,
   enviarRecuperacao: enviarRecuperacao,
+  enviarCodigoRecuperacao: enviarCodigoRecuperacao,
   enviarRedefinicaoSenha: enviarRedefinicaoSenha,
   enviarNotificacaoReembolsoAdmin: enviarNotificacaoReembolsoAdmin,
   enviarConfirmacaoAgendamento: enviarConfirmacaoAgendamento,

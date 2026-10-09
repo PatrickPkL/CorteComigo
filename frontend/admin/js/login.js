@@ -79,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
      painel em branco (nenhum form visível). */
   function voltarAoInicio() {
     if (etapaCodigo) etapaCodigo.style.display = 'none';
+    const etapaRec = document.getElementById('etapa-recuperar');
+    if (etapaRec) etapaRec.style.display = 'none';
     fluxo = null;
     if (inputCodigo) inputCodigo.value = '';
     todosForms().forEach(f => {
@@ -350,6 +352,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-reenviar')?.addEventListener('click', (e) => {
     e.preventDefault();
     if (!fluxo) return;
+    /* recuperação: reenvia o código de acesso (não é requestCode) */
+    if (fluxo.payload && fluxo.payload.modo === 'recuperacao') {
+      try {
+        const r = API.recuperarAcesso(fluxo.ident);
+        if (r && r.enviado === false) {
+          showToast(r.aviso || 'Não foi possível enviar o e-mail.', 'warning');
+        } else {
+          showToast('Novo código enviado para ' + fluxo.ident + '.', 'success');
+        }
+      } catch (err) {
+        showToast(msgErro(err), 'error');
+      }
+      return;
+    }
     pedirCodigo(fluxo.payload);
   });
 
@@ -394,20 +410,23 @@ document.addEventListener('DOMContentLoaded', () => {
   formRecuperar?.addEventListener('submit', e => {
     e.preventDefault();
     const email = document.getElementById('input-rec-email').value.trim();
-    const senha = document.getElementById('input-rec-senha').value;
-    if (!email || !senha) {
-      showToast('Preencha e-mail e senha atual.', 'error');
+    if (!email) {
+      showToast('Informe o e-mail cadastrado.', 'error');
       return;
     }
     try {
-      const r = API.solicitarRedefinicaoSenha(email, senha);
+      /* envia um código de 6 dígitos por e-mail; sem senha atual.
+         anti-enumeração: resposta igual para e-mail cadastrado ou não. */
+      const r = API.recuperarAcesso(email);
       if (r && r.enviado === false) {
-        showToast(r.aviso || 'Não foi possível enviar o e-mail (SMTP não configurado).', 'warning');
-      } else {
-        showToast('Link de redefinição enviado para seu e-mail.', 'success');
+        showToast(r.aviso || 'Não foi possível enviar o e-mail (SMTP não configurado).', 'error');
+        return;
       }
+      fluxo = { phone: email, ident: email, payload: { modo: 'recuperacao', email: email } };
       formRecuperar.reset();
-      btnVoltarRec?.click();
+      if (etapaRecuperar) etapaRecuperar.style.display = 'none';
+      mostrarEtapaCodigo(r);
+      showToast('Se este e-mail estiver cadastrado, enviamos um código de 6 dígitos.', 'success');
     } catch (erro) {
       showToast(msgErro(erro), 'error');
     }
