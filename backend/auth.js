@@ -835,6 +835,92 @@ function usuarioComSenhaPorIdentidade(db, ident) {
   }
 
   /**
+   * Recuperação de acesso COM definição de nova senha (por código de 6 dígitos).
+   * Etapa única: verifica o código enviado por recuperarAcesso() e, em caso
+   * de sucesso, grava a nova senha do usuário e já abre a sessão. Assim o
+   * usuário não fica preso no login por código: no próximo acesso usa
+   * e-mail + senha normalmente.
+   *
+   * Anti-enumeração: como só chega aqui quem pediu o código para um e-mail
+   * (e o código é a prova de posse), a mensagem de conta inexistente é
+   * genérica ("Código incorreto") para não revelar cadastro.
+   */
+  function redefinirSenhaComCodigo(identBruto, codeBruto, novaSenha, confirmarSenha) {
+    const db = DB._d();
+    const ident = normalizarIdentidade(identBruto);
+    const code = String(codeBruto || '').replace(/\D/g, '');
+
+    if (!ehEmail(ident) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ident)) {
+      throw { status: 400, error: 'Informe um e-mail válido.' };
+    }
+    if (!novaSenha || !confirmarSenha) {
+      throw { status: 400, error: 'Informe a nova senha e a confirmação.' };
+    }
+    if (novaSenha !== confirmarSenha) {
+      throw { status: 400, error: 'A nova senha e a confirmação não coincidem.' };
+    }
+    validarForcaSenha(novaSenha);
+
+    /* rate limiting login (mesmo contador do verifyCode) */
+    const bloqueio = verificarBloqueioLogin(ident);
+    if (bloqueio) {
+      throw { status: 429, error: 'Muitas tentativas. Aguarde ' + bloqueio.minutos + ' min para tentar novamente.' };
+    }
+
+    const reg = codigoAtivo(ident);
+    if (!reg) throw { status: 400, error: 'Nenhum código ativo. Solicite um novo código.' };
+    if (reg.attempts >= MAX_TENTATIVAS) {
+      db.sms_codes = db.sms_codes.filter(c => c.id !== reg.id);
+      DB.salvar();
+      throw { status: 400, error: 'Código bloqueado após 5 tentativas. Solicite um novo.' };
+    }
+    if (agoraMs() > reg.expires_at) {
+      db.sms_codes = db.sms_codes.filter(c => c.id !== reg.id);
+      DB.salvar();
+      throw { status: 400, error: 'Código expirado. Solicite um novo código.' };
+    }
+    if (code.length !== 6) throw { status: 400, error: 'Informe o código de 6 dígitos.' };
+    if (reg.code !== code) {
+      reg.attempts += 1;
+      DB.salvar();
+      registrarFalhaLogin(ident);
+      const restantes = MAX_TENTATIVAS - reg.attempts;
+      throw { status: 400, error: 'Código incorreto.' + (restantes > 0 ? ' Tentativas restantes: ' + restantes + '.' : '') };
+    }
+
+    /* conta alvo: a que tem senha cadastrada, quando houver identidade dupla */
+    let usuario = usuarioPorIdentidade(db, ident);
+    if (usuario && usuario.role === 'dependente') usuario = null;
+    if (usuario && !usuario.password_hash) {
+      const comSenha = usuarioComSenhaPorIdentidade(db, ident);
+      if (comSenha) usuario = comSenha;
+    }
+    if (!usuario) {
+      /* código correto comprova posse; não revelamos o motivo exato */
+      throw { status: 400, error: 'Código incorreto.' };
+    }
+
+    /* sucesso: limpa falhas, consome o código (uso único) e grava a senha */
+    limparFalhasLogin(ident);
+    db.sms_codes = db.sms_codes.filter(c => c.id !== reg.id);
+    usuario.password_hash = hashSenha(novaSenha);
+    usuario.verified = 1;
+    usuario.updated_at = new Date().toISOString();
+    DB.salvar();
+
+    /* invalida todas as sessões antigas e abre uma nova para o usuário */
+    logoutTodos(usuario.id);
+    criarSessao(usuario.id);
+    _auditLog(usuario.id, 'redefinir_senha');
+
+    let barbearia = null;
+    if (usuario.role === 'dono' || usuario.role === 'barbeiro') {
+      barbearia = salaoDoUsuario(usuario);
+    }
+    return { token: localStorage.getItem('token'), user: publicUser(usuario), barbershop: barbearia };
+  }
+
+  /**
    * RF-005 — provisionamento do dono.
    */
   function provisionarSalao(usuario, nomeSalao) {
@@ -929,6 +1015,7 @@ function usuarioComSenhaPorIdentidade(db, ident) {
     recuperarAcesso,
     solicitarRedefinicaoSenha,
     redefinirSenha,
+    redefinirSenhaComCodigo,
     verifyCode,
     loginComSenha,
     usuarioAtual,

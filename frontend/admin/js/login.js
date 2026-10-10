@@ -68,6 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputCodigo = document.getElementById('input-codigo');
 
   let fluxo = null;      // {phone, ident, payload}
+  let recForcaLigada = false;   // medidor de força da nova senha (liga só 1x)
   const SEL_FORMS = '#painel-cliente form, #painel-dono form, #painel-depend form';
 
   function todosForms() {
@@ -81,6 +82,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (etapaCodigo) etapaCodigo.style.display = 'none';
     const etapaRec = document.getElementById('etapa-recuperar');
     if (etapaRec) etapaRec.style.display = 'none';
+    const camposSenha = document.getElementById('campos-nova-senha');
+    if (camposSenha) camposSenha.style.display = 'none';
+    const ns = document.getElementById('rec-nova-senha'); if (ns) ns.value = '';
+    const cs = document.getElementById('rec-confirmar-senha'); if (cs) cs.value = '';
     fluxo = null;
     if (inputCodigo) inputCodigo.value = '';
     todosForms().forEach(f => {
@@ -130,9 +135,27 @@ document.addEventListener('DOMContentLoaded', () => {
     /* esconde TODOS os forms dos três painéis; voltarAoInicio devolve o
        formulário certo (o da aba ativa do painel ativo) */
     todosForms().forEach(f => { f.style.display = 'none'; });
+
+    /* recuperação de acesso: pede a nova senha junto com o código, para o
+       usuário definir a senha e poder logar normalmente depois. */
+    const recuperacao = !!(fluxo && fluxo.payload && fluxo.payload.modo === 'recuperacao');
+    const camposSenha = document.getElementById('campos-nova-senha');
+    const btnVerificar = document.getElementById('btn-verificar-codigo');
+    if (camposSenha) camposSenha.style.display = recuperacao ? '' : 'none';
+    if (btnVerificar) btnVerificar.textContent = recuperacao ? 'Definir senha e entrar' : 'Verificar e entrar';
+    if (recuperacao) {
+      const ns = document.getElementById('rec-nova-senha');
+      const cs = document.getElementById('rec-confirmar-senha');
+      if (ns) ns.required = true;
+      if (cs) cs.required = true;
+      if (!recForcaLigada) { atualizarForcaSenha('rec-nova-senha', 'rec-senha-forca'); recForcaLigada = true; }
+    }
+
     if (bannerCodigo) {
       bannerCodigo.hidden = false;
-      bannerCodigo.innerHTML = '<strong>Verifique seu e-mail</strong> — você recebeu um código de 6 dígitos.';
+      bannerCodigo.innerHTML = recuperacao
+        ? '<strong>Verifique seu e-mail</strong> — digite o código e crie sua nova senha.'
+        : '<strong>Verifique seu e-mail</strong> — você recebeu um código de 6 dígitos.';
     }
     if (infoFone) {
       const destinoRegistro = (fluxo && fluxo.payload && fluxo.payload.modo === 'registro' && fluxo.payload.email)
@@ -331,15 +354,35 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('form-verificar-codigo')?.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!fluxo) return;
+    const recuperacao = !!(fluxo.payload && fluxo.payload.modo === 'recuperacao');
     try {
-      const r = Auth.verifyCode(fluxo.phone, inputCodigo.value);
+      let r;
+      if (recuperacao) {
+        const nova = document.getElementById('rec-nova-senha').value;
+        const conf = document.getElementById('rec-confirmar-senha').value;
+        const validacao = Auth.validarForcaSenha(nova);
+        if (!validacao.ok) {
+          showToast('Senha fraca: ' + validacao.erros.join(', '), 'error');
+          return;
+        }
+        if (nova !== conf) {
+          showToast('A nova senha e a confirmação não coincidem.', 'error');
+          return;
+        }
+        /* valida o código, grava a nova senha e abre a sessão */
+        r = Auth.redefinirSenhaComCodigo(fluxo.ident, inputCodigo.value, nova, conf);
+      } else {
+        r = Auth.verifyCode(fluxo.phone, inputCodigo.value);
+      }
       /* flash antigo (ex.: "faça login para denunciar") não deve
          aparecer depois do login bem-sucedido */
       sessionStorage.removeItem('cc_flash');
       const primeiro = (r.user && r.user.name ? r.user.name.split(' ')[0] : '');
-      showToast(r.user && r.user.role === 'dono'
-        ? 'Bem-vindo de volta, ' + primeiro + '!'
-        : 'Login realizado com sucesso!');
+      showToast(recuperacao
+        ? 'Senha criada! Entrando...'
+        : (r.user && r.user.role === 'dono'
+          ? 'Bem-vindo de volta, ' + primeiro + '!'
+          : 'Login realizado com sucesso!'));
       setTimeout(() => { window.location.href = destinoPosLogin(r.user); }, 700);
     } catch (err) {
       showToast(msgErro(err), 'error');

@@ -284,8 +284,11 @@ const _RPC_BLOQUEADOS = new Set([
 const _RPC_AUTH_PUBLICOS = new Set([
   'requestCode', 'reenviarCodigo', 'reenviarCodigoIdentidade', 'verifyCode',
   'recuperarAcesso', 'logout', 'loginComSenha',
-  'solicitarRedefinicaoSenha', 'redefinirSenha'
+  'solicitarRedefinicaoSenha', 'redefinirSenha', 'redefinirSenhaComCodigo'
 ]);
+/* Métodos cujo payload traz um código de 6 dígitos: passam pelo mesmo
+   guarda de força bruta por IP/identidade (bloqueio e contagem de falhas). */
+const _metodosComCodigo = new Set(['verifyCode', 'redefinirSenhaComCodigo']);
 /* Métodos de Auth que EXIGEM sessão válida (também em _authRequired). */
 const _RPC_AUTH_COM_SESSAO = new Set([
   'alterarSenha'
@@ -458,8 +461,8 @@ function handleRpc(req, res) {
     const ts = new Date().toISOString();
     // [SEGURANÇA] Nunca logar tokens, e-mails, telefones ou payloads de request
 
-    /* brute-force guard para verifyCode */
-    if (metodo === 'verifyCode') {
+    /* brute-force guard para métodos com código de 6 dígitos */
+    if (_metodosComCodigo.has(metodo)) {
       const rec = _failedAuth.get(ip);
       if (rec && Date.now() < rec.blockedUntil) {
         const retryAfter = Math.ceil((rec.blockedUntil - Date.now()) / 1000);
@@ -476,12 +479,12 @@ function handleRpc(req, res) {
         return void dados
           .then(
             valor => {
-              if (metodo === 'verifyCode') _failedAuth.delete(ip);
+              if (_metodosComCodigo.has(metodo)) _failedAuth.delete(ip);
               json(res, 200, { ok: true, data: valor === undefined ? null : valor });
             },
             e => {
               const st = (e && e.status) || 500;
-              if (metodo === 'verifyCode' && st >= 400 && st < 500) {
+              if (_metodosComCodigo.has(metodo) && st >= 400 && st < 500) {
                 const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
                 prev.count++;
                 if (prev.count >= AUTH_FAIL_MAX) {
@@ -495,7 +498,7 @@ function handleRpc(req, res) {
                 }
                 _failedAuth.set(ip, prev);
                 // [SEGURANÇA] Incrementa tbm por identidade (e-mail/CPF)
-                if (ident && metodo === 'verifyCode') {
+                if (ident && _metodosComCodigo.has(metodo)) {
                   const identKey = 'ident:' + String(ident).toLowerCase().trim();
                   const recIdent = _failedAuthByIdent.get(identKey) || { count: 0, blockedUntil: 0 };
                   recIdent.count++;
@@ -517,14 +520,14 @@ function handleRpc(req, res) {
             delete global.__CC_HTTP;
           });
       }
-      if (metodo === 'verifyCode') _failedAuth.delete(ip);
+      if (_metodosComCodigo.has(metodo)) _failedAuth.delete(ip);
       const saida = json(res, 200, { ok: true, data: dados === undefined ? null : dados });
       delete global.__CC_REQUEST_TOKEN;
       delete global.__CC_HTTP;
       return saida;
     } catch (e) {
       const status = (e && e.status) || 500;
-      if (metodo === 'verifyCode' && status >= 400 && status < 500) {
+      if (_metodosComCodigo.has(metodo) && status >= 400 && status < 500) {
         const prev = _failedAuth.get(ip) || { count: 0, blockedUntil: 0 };
         prev.count++;
         if (prev.count >= AUTH_FAIL_MAX) {
@@ -538,7 +541,7 @@ function handleRpc(req, res) {
         }
         _failedAuth.set(ip, prev);
         // [SEGURANÇA] Incrementa tambem por identidade (e-mail/CPF)
-        if (ident && metodo === 'verifyCode') {
+        if (ident && _metodosComCodigo.has(metodo)) {
           const identKey = 'ident:' + String(ident).toLowerCase().trim();
           const recIdent = _failedAuthByIdent.get(identKey) || { count: 0, blockedUntil: 0 };
           recIdent.count++;

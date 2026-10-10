@@ -238,6 +238,12 @@
       return gravarSessao(rpc('verifyCode', [phone, code]));
     },
 
+    /* recuperação de acesso COM nova senha: valida o código de 6 dígitos,
+       grava a senha e já abre a sessão (espelho de redefinirSenhaComCodigo) */
+    redefinirSenhaComCodigo(email, code, novaSenha, confirmarSenha) {
+      return gravarSessao(rpc('redefinirSenhaComCodigo', [email, code, novaSenha, confirmarSenha]));
+    },
+
     usuarioAtual() {
       try { return JSON.parse(localStorage.getItem(KEY_USER)) || null; }
       catch (e) { return null; }

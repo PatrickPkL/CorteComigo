@@ -252,7 +252,33 @@
                    placeholder="000000" required autocomplete="one-time-code"
                    style="text-align:center; font-size:20px; letter-spacing:8px;">
           </div>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Verificar e entrar</button>
+          <!-- passo extra só na RECUPERAÇÃO: define a nova senha no mesmo envio.
+               Oculto por padrão; login.js mostra quando o fluxo é 'recuperacao'. -->
+          <div id="campos-nova-senha" style="display:none;">
+            <div class="field">
+              <label for="rec-nova-senha">Nova senha</label>
+              <div class="password-wrapper">
+                <input type="password" id="rec-nova-senha" placeholder="Crie uma senha forte" autocomplete="new-password" minlength="8" maxlength="12">
+                <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                  <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+              <div id="rec-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
+              <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
+            </div>
+            <div class="field">
+              <label for="rec-confirmar-senha">Confirmar nova senha</label>
+              <div class="password-wrapper">
+                <input type="password" id="rec-confirmar-senha" placeholder="Repita a nova senha" autocomplete="new-password" minlength="8" maxlength="12">
+                <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
+                  <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="btn-verificar-codigo" style="width:100%; justify-content:center;">Verificar e entrar</button>
           <p style="text-align:center; margin-top:14px; font-size:13.5px;">
             <a href="#" id="btn-reenviar" style="color:var(--brass);">Reenviar código</a> ·
             <a href="#" id="btn-voltar-login" style="color:var(--brass);">Voltar</a>
@@ -264,7 +290,7 @@
       <div id="etapa-recuperar" style="display:none;">
         <h3 class="section-title" style="margin-bottom:12px;">Recuperar acesso</h3>
         <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
-          Informe o e-mail cadastrado. Enviaremos um código de 6 dígitos para você entrar na conta.</p>
+          Informe o e-mail cadastrado. Enviaremos um código de 6 dígitos para você criar uma nova senha e entrar na conta.</p>
         <form id="form-recuperar">
           <div class="field">
             <label for="input-rec-email">E-mail cadastrado</label>
