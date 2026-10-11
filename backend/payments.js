@@ -36,6 +36,15 @@
   function agoraISO() { return new Date().toISOString().slice(0, 16); }
   function agoraMsISO() { return new Date().toISOString(); }
 
+  /* Compara a expiração por VALOR (Date.parse), nunca por texto: o
+     expires_at do Mercado Pago vem com offset "-03:00" e a comparação
+     lexicográfica contra o UTC do toISOString() marcava o PIX como
+     expirado no mesmo instante em que era criado. */
+  function expirou(iso) {
+    const t = Date.parse(iso);
+    return isNaN(t) ? false : t <= Date.now();
+  }
+
   function chaveApi() {
     return String(process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim();
   }
@@ -369,12 +378,11 @@
     const totalCents = Math.round((basePlano + porProf * extraFuncionarios) * 100);
 
     /* pendente reutilizável? */
-    const agora = agoraMsISO();
     const existente = db.payments.find(p =>
       p.barbershop_id === shopId && p.plan_id === plano.id &&
       p.billing_period === dias && (p.installments || 1) === nParc &&
       (p.metodo || 'pix') === mtd &&
-      p.status === 'pending' && p.expires_at > agora);
+      p.status === 'pending' && !expirou(p.expires_at));
     if (existente) return pagamentoPublico(existente);
 
     const pag = {
@@ -472,7 +480,7 @@
     if (pag.status !== 'pending') return pagamentoPublico(pag);
 
     /* expirou sem pagar */
-    if (pag.expires_at <= agoraMsISO()) {
+    if (expirou(pag.expires_at)) {
       pag.status = 'expired';
       DB.salvar();
       return pagamentoPublico(pag);

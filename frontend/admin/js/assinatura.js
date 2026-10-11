@@ -373,9 +373,6 @@ function fecharPagamento() {
       semqr.hidden = false;
     }
     document.getElementById('pg-codigo').value = c.br_code || '';
-    const btnSim = document.getElementById('pg-simular');
-    btnSim.hidden = c.provider !== 'demo';
-    btnSim.textContent = 'Simular pagamento (modo teste)';
     atualizarStatus(c);
     iniciarRelogio(c.expires_at);
 
@@ -438,22 +435,6 @@ function fecharPagamento() {
       });
     } else {
       document.execCommand('copy'); done();
-    }
-  });
-
-  document.getElementById('pg-simular')?.addEventListener('click', () => {
-    if (!cobrancaId) return;
-    try {
-      const c = API.simularCobranca(cobrancaId);
-      atualizarStatus(c);
-      if (c.status === 'paid') {
-        showToast('Pagamento confirmado! Plano ' + c.plan_name + ' ativo.', 'success');
-        setTimeout(fecharPagamento, 900);
-      } else {
-        showToast('Simulação enviada — confirmando…', 'info');
-      }
-    } catch (e) {
-      showToast(msgErro(e), 'error');
     }
   });
 
