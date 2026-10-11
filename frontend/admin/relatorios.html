@@ -186,19 +186,15 @@
       </div>
     </div>
 
-    <div class="card-row cols-2">
+    <div class="card-row cols-2" id="row-clientes-planos">
       <div class="card">
         <h3 class="section-title" id="lbl-chart-clientes">Novos clientes por mês</h3>
         <p class="chart-caption" id="lbl-chart-clientes-sub">Clientes cadastrados por mês (últimos 12 meses)</p>
         <div class="chart-box"><canvas id="chart-clientes"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card" id="card-planos">
         <h3 class="section-title">Assinaturas por plano</h3>
         <p class="chart-caption" id="lbl-planos-sub">Quantidade de lojas em cada plano, por status.</p>
-        <div id="planos-vazio" class="plans-empty" hidden>
-          Disponível apenas no acesso de <strong>super-admin</strong>.
-          Entre no painel super-admin e abra os Relatórios para acompanhar os planos da plataforma.
-        </div>
         <div class="chart-box chart-box-sm"><canvas id="chart-planos"></canvas></div>
         <table class="plans-table" id="tabela-planos">
           <thead>

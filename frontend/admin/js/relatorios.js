@@ -444,13 +444,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function prepararModoSalao() {
-    const vazio = document.getElementById('planos-vazio');
-    if (vazio) vazio.hidden = false;
-    const cv = document.getElementById('chart-planos');
-    if (cv) { cv.hidden = true; }
-    const tb = document.getElementById('tabela-planos');
-    if (tb) { tb.hidden = true; }
-    setText('lbl-planos-sub', 'Para acompanhar as assinaturas da plataforma, entre como super-admin.');
+    /* O card "Assinaturas por plano" é dado de plataforma (super-admin).
+       Para o dono ele não existe: é removido por completo e a linha
+       colapsa para 1 coluna, deixando "Novos clientes" na largura toda. */
+    const cardPlanos = document.getElementById('card-planos');
+    if (cardPlanos && cardPlanos.parentNode) cardPlanos.parentNode.removeChild(cardPlanos);
+    const row = document.getElementById('row-clientes-planos');
+    if (row) row.style.gridTemplateColumns = '1fr';
 
     const tabs = document.getElementById('rel-tabs');
     if (tabs) tabs.hidden = false;
