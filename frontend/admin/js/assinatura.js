@@ -300,7 +300,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let cobrancaId = null;
   let timerPoll = null;
   let timerRelogio = null;
-  let pagamentoPendente = null;
 
   function pararTimers() {
     clearInterval(timerPoll);
@@ -360,9 +359,7 @@ function fecharPagamento() {
     setText('pg-plano', rotulo);
     setText('pg-valor', DB.fmtBRL(c.amount_cents / 100));
 
-    const docBox = document.getElementById('pg-doc-box');
     const checkout = document.getElementById('pg-checkout');
-    if (docBox) docBox.hidden = true;
     if (checkout) checkout.hidden = false;
 
     const qr = document.getElementById('pg-qrcode');
@@ -401,81 +398,30 @@ function fecharPagamento() {
     abrirModal(modalPg);
   }
 
-  /* O Mercado Pago (PIX) exige o CPF/CNPJ do pagador (dono do salão) para
-     gerar a cobrança. Por isso o modal abre primeiro num passo de coleta do
-     documento e só depois chama a API para criar o PIX. */
-  function formatarDoc(v) {
-    const d = String(v || '').replace(/\D/g, '').slice(0, 14);
-    if (d.length <= 11) {
-      if (d.length > 9) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
-      if (d.length > 6) return d.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
-      if (d.length > 3) return d.replace(/(\d{3})(\d{1,3})/, '$1.$2');
-      return d;
-    }
-    if (d.length > 12) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2})/, '$1.$2.$3/$4-$5');
-    if (d.length > 8) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{1,4})/, '$1.$2.$3/$4');
-    if (d.length > 5) return d.replace(/(\d{2})(\d{3})(\d{1,3})/, '$1.$2.$3');
-    return d.replace(/(\d{2})(\d{1,3})/, '$1.$2');
-  }
-
+  /* Cria a cobrança PIX direto ao escolher o plano — o Mercado Pago não
+     exige CPF/CNPJ do pagador, então não há passo de documento. */
   function abrirPagamento(plano, periodo, parcelas) {
-    pagamentoPendente = { plano, periodo: periodo || 'mensal', parcelas: parcelas || 1 };
-    const docBox = document.getElementById('pg-doc-box');
-    const checkout = document.getElementById('pg-checkout');
-    if (docBox) docBox.hidden = false;
-    if (checkout) checkout.hidden = true;
-    const erroEl = document.getElementById('pg-doc-erro');
-    if (erroEl) erroEl.textContent = '';
+    if (!plano) return;
+    const anual = periodo === 'anual';
     const titulo = document.getElementById('pg-titulo');
     if (titulo) titulo.textContent = 'Pagar com PIX';
-    setText('pg-plano', 'Plano ' + plano.name + ' · ' + (periodo === 'anual' ? 'anual' : '30 dias'));
+    setText('pg-plano', 'Plano ' + plano.name + ' · ' + (anual ? 'anual' : '30 dias'));
     const valorAnual = plano.price_annual != null && Number(plano.price_annual) > 0
       ? Number(plano.price_annual) : Number(plano.price_monthly) * 12;
-    setText('pg-valor', periodo === 'anual'
-      ? DB.fmtBRL(valorAnual) : DB.fmtBRL(Number(plano.price_monthly)));
-    const inp = document.getElementById('pg-doc');
-    if (inp) {
-      let salvo = '';
-      try { salvo = localStorage.getItem('cc_pagador_doc') || ''; } catch (e) { /* noop */ }
-      inp.value = salvo ? formatarDoc(salvo) : '';
-    }
+    setText('pg-valor', DB.fmtBRL(anual ? valorAnual : Number(plano.price_monthly)));
+
+    const checkout = document.getElementById('pg-checkout');
+    if (checkout) checkout.hidden = true;
     abrirModal(modalPg);
-    if (inp) setTimeout(() => inp.focus(), 50);
-  }
 
-  function gerarPix() {
-    if (!pagamentoPendente) return;
-    const inp = document.getElementById('pg-doc');
-    const erroEl = document.getElementById('pg-doc-erro');
-    const digitos = String(inp ? inp.value : '').replace(/\D/g, '');
-    if (!(digitos.length === 11 || digitos.length === 14)) {
-      if (erroEl) erroEl.textContent = 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido do titular.';
-      if (inp) inp.focus();
-      return;
-    }
-    if (erroEl) erroEl.textContent = '';
-    try { localStorage.setItem('cc_pagador_doc', digitos); } catch (e) { /* noop */ }
-    const btn = document.getElementById('pg-gerar');
-    if (btn) { btn.disabled = true; btn.textContent = 'Gerando PIX…'; }
     try {
-      const c = API.criarCobrancaPlano(
-        pagamentoPendente.plano.id, pagamentoPendente.periodo, pagamentoPendente.parcelas,
-        'pix', { cpfCnpj: digitos });
-      mostrarCobranca(c, pagamentoPendente.plano);
+      const c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'pix');
+      mostrarCobranca(c, plano);
     } catch (e) {
-      if (erroEl) erroEl.textContent = msgErro(e);
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Gerar PIX'; }
+      showToast(msgErro(e), 'error');
+      fecharPagamento();
     }
   }
-
-  document.getElementById('pg-gerar')?.addEventListener('click', gerarPix);
-  document.getElementById('pg-doc')?.addEventListener('input', e => {
-    e.target.value = formatarDoc(e.target.value);
-  });
-  document.getElementById('pg-doc')?.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); gerarPix(); }
-  });
 
   document.getElementById('btn-fechar-pagamento')?.addEventListener('click', fecharPagamento);
   modalPg?.addEventListener('click', e => {

@@ -15,9 +15,9 @@
    2. Webhook — server.js recebe POST /webhooks/mercadopago,
       valida o header x-signature e chama processarEventoWebhook().
 
-   O PIX do Mercado Pago EXIGE os dados do pagador (payer): nome,
-   e-mail e CPF/CNPJ. Por isso a tela de Assinatura coleta o
-   documento do dono antes de gerar a cobrança.
+   O PIX do Mercado Pago exige apenas os dados básicos do pagador
+   (payer): nome e e-mail. CPF/CNPJ é opcional (a API aceita o PIX
+   sem o documento), então a tela de Assinatura não o solicita.
 
    Ao confirmar: subscription.status='ativa', plan_id do plano
    pago e current_period_end estendido em +30 dias (mensal) ou
@@ -40,9 +40,16 @@
     return String(process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim();
   }
 
+  /* O Mercado Pago só aceita notification_url https pública. Em dev
+     (http://localhost:3000) ela precisa ser omitida, senão a API recusa a
+     cobrança com "notification_url attribute must be url valid". */
   function urlWebhook() {
     const base = String(process.env.APP_URL || '').trim().replace(/\/+$/, '');
-    return base ? base + '/webhooks/mercadopago' : null;
+    if (!base || !/^https:\/\//i.test(base)) return null;
+    let host = '';
+    try { host = new URL(base).hostname.toLowerCase(); } catch (e) { return null; }
+    if (host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || /\.local$/.test(host)) return null;
+    return base + '/webhooks/mercadopago';
   }
 
   /* [SEGURANÇA] Ambiente de produção. Sem isto, um erro de deploy
@@ -184,12 +191,14 @@
   }
 
   /**
-   * Normaliza o documento do pagador (obrigatório no PIX do Mercado
-   * Pago). Aceita CPF (11 dígitos) ou CNPJ (14 dígitos), com ou sem
-   * máscara. Lança 400 com mensagem clara quando inválido.
+   * Normaliza o documento do pagador (opcional no PIX do Mercado Pago).
+   * Aceita CPF (11 dígitos) ou CNPJ (14 dígitos), com ou sem máscara.
+   * Sem documento, devolve null (a API do MP aceita PIX só com o e-mail);
+   * com documento inválido, lança 400 para não enviar lixo à API.
    */
   function normalizarDocumento(pagador) {
     const num = somenteDigitos(pagador && (pagador.cpfCnpj || pagador.documento));
+    if (!num) return null;
     if (num.length === 11 && cpfValido(num)) return { tipo: 'CPF', numero: num };
     if (num.length === 14 && cnpjValido(num)) return { tipo: 'CNPJ', numero: num };
     throw {
@@ -246,12 +255,11 @@
       payment_method_id: 'pix',
       external_reference: 'cc_pay_' + pag.id,
       date_of_expiration: dataExpiracaoISO(EXPIRA_EM_SEG),
-      payer: {
+      payer: Object.assign({
         email: email,
         first_name: nome.first,
-        last_name: nome.last,
-        identification: { type: doc.tipo, number: doc.numero }
-      }
+        last_name: nome.last
+      }, doc ? { identification: { type: doc.tipo, number: doc.numero } } : {})
     };
     const notif = urlWebhook();
     if (notif) body.notification_url = notif;
