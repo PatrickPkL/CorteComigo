@@ -76,7 +76,7 @@ function esperaErro(fn) {
   /* pagamento pago de HOJE, para a loja ficar dentro da janela de 7 dias */
   const pagamentoTeste = {
     id: DB.proximoId(), barbershop_id: loja.id, plan_id: null, amount_cents: 1990,
-    status: 'paid', provider: 'demo', abacate_id: null, br_code: null, qr_base64: null,
+    status: 'paid', provider: 'demo', provider_id: null, br_code: null, qr_base64: null,
     dev_mode: true, refunded_at: null, refund_reason: null, refund_id: null,
     created_at: new Date().toISOString(), expires_at: null, paid_at: new Date().toISOString()
   };

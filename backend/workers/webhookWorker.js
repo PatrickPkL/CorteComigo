@@ -4,9 +4,10 @@ const crypto = require('crypto');
 
 /* Worker de webhooks (BullMQ). Só roda se houver Redis: a hospedagem
    compartilhada não tem Redis gerenciado e nada no boot carrega este
-   arquivo — o webhook de PIX é tratado direto por server.js. */
+   arquivo — o webhook de PIX do Mercado Pago é tratado direto por
+   server.js (que valida o header x-signature). */
 
-const SEGREDO = () => String(process.env.ABACATEPAY_WEBHOOK_SECRET || '');
+const SEGREDO = () => String(process.env.MERCADOPAGO_WEBHOOK_SECRET || '');
 
 /* Comparação em tempo constante: `!` simples vaza informação por
    timing e rejeitava assinatura válida por erro de codificação. */
@@ -30,24 +31,15 @@ const worker = new Worker('webhooks', async (job) => {
     throw new Error('Assinatura de webhook inválida');
   }
 
-  switch (payload.event) {
-    case 'pix.payment.received':
-      await handlePixPaymentReceived(payload.data);
-      break;
-    case 'pix.payment.expired':
-      await handlePixPaymentExpired(payload.data);
-      break;
-    case 'billing.subscription.created':
-      await handleSubscriptionCreated(payload.data);
-      break;
-    case 'billing.subscription.cancelled':
-      await handleSubscriptionCancelled(payload.data);
+  switch (payload.type || payload.event) {
+    case 'payment':
+      await handlePayment(payload.data);
       break;
     default:
-      console.warn('[Webhook] Evento não tratado:', payload && payload.event);
+      console.warn('[Webhook] Evento não tratado:', payload && (payload.type || payload.event));
   }
 
-  return { processed: true, event: payload.event };
+  return { processed: true, event: payload.type || payload.event };
 }, {
   connection: redis,
   concurrency: 5,
@@ -57,20 +49,8 @@ const worker = new Worker('webhooks', async (job) => {
   },
 });
 
-async function handlePixPaymentReceived(data) {
-  console.log('[Webhook] PIX recebido:', data && data.id);
-}
-
-async function handlePixPaymentExpired(data) {
-  console.log('[Webhook] PIX expirado:', data && data.id);
-}
-
-async function handleSubscriptionCreated(data) {
-  console.log('[Webhook] Assinatura criada:', data && data.id);
-}
-
-async function handleSubscriptionCancelled(data) {
-  console.log('[Webhook] Assinatura cancelada:', data && data.id);
+async function handlePayment(data) {
+  console.log('[Webhook] Pagamento recebido:', data && data.id);
 }
 
 worker.on('completed', (job) => {

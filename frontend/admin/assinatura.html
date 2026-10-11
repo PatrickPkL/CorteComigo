@@ -192,22 +192,36 @@
           <p style="margin:4px 0 0;" class="eyebrow" id="pg-plano">—</p>
           <div class="stat-value mono" id="pg-valor" style="font-size:26px;">—</div>
 
-          <div id="pg-pix-box">
-            <img id="pg-qrcode" alt="QR Code PIX" hidden
-                 style="width:210px;height:210px;margin:10px auto 6px;display:block;background:#fff;padding:8px;border-radius:10px;">
-            <p id="pg-semqr" hidden style="color:var(--text-muted); font-size:13px; margin:8px 0 2px;">
-              QR indisponível neste modo — use o código copia-e-cola abaixo.</p>
-            <div style="display:flex; gap:8px; margin-top:8px;">
-              <input type="text" id="pg-codigo" readonly
-                     style="flex:1; font-size:11px; font-family:monospace;">
-              <button type="button" class="btn btn-outline" id="pg-copiar">Copiar</button>
-            </div>
+          <div id="pg-doc-box" style="text-align:left; margin-top:14px;">
+            <label for="pg-doc" style="display:block; font-size:13px; color:var(--text-muted); margin-bottom:6px;">
+              CPF ou CNPJ do titular que assina o plano</label>
+            <input type="text" id="pg-doc" inputmode="numeric" autocomplete="off" maxlength="18"
+                   placeholder="CPF (11 dígitos) ou CNPJ (14 dígitos)"
+                   style="width:100%;">
+            <div id="pg-doc-erro" role="alert"
+                 style="min-height:16px; font-size:12.5px; color:var(--warn-text); margin-top:6px;"></div>
+            <button type="button" class="btn btn-brass" id="pg-gerar" style="width:100%; margin-top:4px;">
+              Gerar PIX</button>
           </div>
 
-          <p id="pg-status" style="margin:12px 0 0; font-size:14px; color:var(--text-muted);">
-            Aguardando pagamento…</p>
-          <button type="button" class="btn btn-brass" id="pg-simular" hidden style="margin-top:12px;">
-            Simular pagamento (modo teste)</button>
+          <div id="pg-checkout" hidden>
+            <div id="pg-pix-box">
+              <img id="pg-qrcode" alt="QR Code PIX" hidden
+                   style="width:210px;height:210px;margin:10px auto 6px;display:block;background:#fff;padding:8px;border-radius:10px;">
+              <p id="pg-semqr" hidden style="color:var(--text-muted); font-size:13px; margin:8px 0 2px;">
+                QR indisponível neste modo — use o código copia-e-cola abaixo.</p>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <input type="text" id="pg-codigo" readonly
+                       style="flex:1; font-size:11px; font-family:monospace;">
+                <button type="button" class="btn btn-outline" id="pg-copiar">Copiar</button>
+              </div>
+            </div>
+
+            <p id="pg-status" style="margin:12px 0 0; font-size:14px; color:var(--text-muted);">
+              Aguardando pagamento…</p>
+            <button type="button" class="btn btn-brass" id="pg-simular" hidden style="margin-top:12px;">
+              Simular pagamento (modo teste)</button>
+          </div>
         </div>
         <div style="display:flex; justify-content:flex-end; margin-top:18px;">
           <button type="button" class="btn btn-outline" id="btn-fechar-pagamento">Fechar</button>

@@ -31,7 +31,7 @@ const EXECUTAR = process.argv.includes('--executar');
 
   const notif = await pg.asAdmin(t => t('notifications').where('type', 'reembolso').count('* as total').first());
   const saTest = await pg.asAdmin(t => t('superadmin_sessions').where('token', 'like', 'sa-%teste-%').orWhere('token', 'like', 'sa-nav-%').count('* as total').first());
-  const payFx = await pg.asAdmin(t => t('payments').where('abacate_id', 'like', '__NAV_REEMB_%').count('* as total').first());
+  const payFx = await pg.asAdmin(t => t('payments').where('provider_id', 'like', '__NAV_REEMB_%').count('* as total').first());
   const sessNav = await pg.asAdmin(t => t('sessions').where('token', 'like', '__NAV_SESS_%').orWhere('token', 'like', 'teste-%').count('* as total').first());
 
   console.log('\nResumo do que seria removido:');
@@ -61,7 +61,7 @@ const EXECUTAR = process.argv.includes('--executar');
   /* Pagamentos de fixture dos testes. Sem isto, um pagamento pago "hoje" do
      teste de navegador mantém a loja dentro da janela de 7 dias e faz o
      suite de prazo (seção 10/11) falhar mesmo com o código correto. */
-  const pay = await pg.asAdmin(t => t('payments').where('abacate_id', 'like', '__NAV_REEMB_%').del());
+  const pay = await pg.asAdmin(t => t('payments').where('provider_id', 'like', '__NAV_REEMB_%').del());
   console.log('Pagamentos de fixture (browser) removidos: ' + pay);
   const sess = await pg.asAdmin(t => t('sessions').where('token', 'like', '__NAV_SESS_%').del());
   console.log('Sessões de navegador removidas: ' + sess);
@@ -70,7 +70,7 @@ const EXECUTAR = process.argv.includes('--executar');
 
   const resto = await pg.asAdmin(t => t('reembolsos').select('id'));
   console.log('Restaram (reembolsos): ' + resto.length);
-  const restoPay = await pg.asAdmin(t => t('payments').where('abacate_id', 'like', '__NAV_REEMB_%').select('id'));
+  const restoPay = await pg.asAdmin(t => t('payments').where('provider_id', 'like', '__NAV_REEMB_%').select('id'));
   console.log('Restaram (pagamentos de fixture): ' + restoPay.length);
   process.exit(0);
 })().catch(e => { console.error('ERRO:', e.message); process.exit(1); });

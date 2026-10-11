@@ -22,7 +22,7 @@ const ARQ = path.join(__dirname, '.navegador.json');
 
   const markers = '__NAV_REEMB_';
   /* limpa artefatos de execuções anteriores */
-  db.payments = (db.payments || []).filter(p => !String(p.abacate_id || '').startsWith(markers));
+  db.payments = (db.payments || []).filter(p => !String(p.provider_id || '').startsWith(markers));
   const comPagamento = [];
   const semPagamento = [];
 
@@ -35,7 +35,7 @@ const ARQ = path.join(__dirname, '.navegador.json');
       db.payments.push({
         id: crypto.randomUUID(), barbershop_id: loja.id, plan_id: null,
         amount_cents: 1990, status: 'paid', provider: 'demo',
-        abacate_id: markers + 'ok', br_code: null, qr_base64: null, dev_mode: true,
+        provider_id: markers + 'ok', br_code: null, qr_base64: null, dev_mode: true,
         refunded_at: null, refund_reason: null, refund_id: null,
         created_at: new Date().toISOString(), expires_at: null,
         paid_at: new Date().toISOString()
@@ -47,7 +47,7 @@ const ARQ = path.join(__dirname, '.navegador.json');
       db.payments.push({
         id: crypto.randomUUID(), barbershop_id: loja.id, plan_id: null,
         amount_cents: 1990, status: 'paid', provider: 'demo',
-        abacate_id: markers + 'velho', br_code: null, qr_base64: null, dev_mode: true,
+        provider_id: markers + 'velho', br_code: null, qr_base64: null, dev_mode: true,
         refunded_at: null, refund_reason: null, refund_id: null,
         created_at: pago, expires_at: null, paid_at: pago
       });

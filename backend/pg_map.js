@@ -253,7 +253,7 @@ const MAP = [
     colecao: 'payments', tabela: 'payments', pk: 'id', dateOut: 'iso',
     toPg: (p) => ({
       id: p.id, barbershop_id: p.barbershop_id, plan_id: p.plan_id || null, amount_cents: p.amount_cents,
-      status: p.status || 'pending', provider: p.provider || 'demo', abacate_id: p.abacate_id,
+      status: p.status || 'pending', provider: p.provider || 'demo', provider_id: p.provider_id,
       br_code: p.br_code, qr_base64: p.qr_base64, dev_mode: tagBool(p.dev_mode),
       billing_period: Number(p.billing_period || 30), installments: Number(p.installments || 1), metodo: p.metodo || 'pix',
       refunded_at: toPgDate(p.refunded_at), refund_reason: p.refund_reason || null, refund_id: p.refund_id || null,
@@ -261,7 +261,7 @@ const MAP = [
     }),
     toMem: (r) => ({
       id: r.id, barbershop_id: r.barbershop_id, plan_id: r.plan_id, amount_cents: r.amount_cents,
-      status: r.status, provider: r.provider, abacate_id: r.abacate_id, br_code: r.br_code,
+      status: r.status, provider: r.provider, provider_id: r.provider_id, br_code: r.br_code,
       qr_base64: r.qr_base64, dev_mode: r.dev_mode ? 1 : 0,
       billing_period: r.billing_period == null ? 30 : Number(r.billing_period),
       installments: r.installments == null ? 1 : Number(r.installments),

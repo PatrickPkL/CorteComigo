@@ -869,48 +869,63 @@ function handleSuperAdmin(req, res, pathname, url) {
   json(res, 404, { ok: false, error: 'Rota super-admin não encontrada.' });
 }
 
-/* ---------------- webhook AbacatePay ---------------- */
+/* ---------------- webhook Mercado Pago ---------------- */
 
-/* Chave do HMAC. O nome antigo era ABACATEPAY_PUBLIC_KEY, mas uma chave
-   PÚBLICA não pode ser segredo de HMAC: se ela estiver publicada (painel,
-   log, resposta de API), qualquer um forja a assinatura. Aceitamos a
-   variável antiga por compatibilidade, mas a nova é a correta. */
-function chaveHmacWebhook() {
-  return String(process.env.ABACATEPAY_WEBHOOK_HMAC_SECRET || '').trim() ||
-         String(process.env.ABACATEPAY_WEBHOOK_SECRET || '').trim();
+/* Chave secreta do webhook (gerada no painel do Mercado Pago, em
+   Webhooks/Notificações). É um segredo — nunca exponha em painel ou log. */
+function chaveWebhookMP() {
+  return String(process.env.MERCADOPAGO_WEBHOOK_SECRET || '').trim();
 }
 
-/* Assinatura HMAC-SHA256 (base64) no header x-webhook-signature */
-function assinaturaValida(corpo, recebida) {
+/* Valida a assinatura oficial do Mercado Pago.
+   Header x-signature: "ts=<ts>,v1=<hmac>"; header x-request-id.
+   Manifesto: "id:<data.id>;request-id:<x-request-id>;ts:<ts>;"
+   assinado em HMAC-SHA256 hex com a chave secreta. */
+function assinaturaMPValida(req, dataId) {
   try {
-    const chave = chaveHmacWebhook();
-    if (!chave || !recebida) return false;
-    const esperada = crypto.createHmac('sha256', chave)
-      .update(Buffer.from(corpo, 'utf8')).digest('base64');
+    const chave = chaveWebhookMP();
+    const xSig = req.headers['x-signature'];
+    const xReqId = req.headers['x-request-id'];
+    if (!chave || !xSig || !xReqId) return false;
+    let ts = '', v1 = '';
+    String(xSig).split(',').forEach(parte => {
+      const i = parte.indexOf('=');
+      if (i < 0) return;
+      const k = parte.slice(0, i).trim();
+      const val = parte.slice(i + 1).trim();
+      if (k === 'ts') ts = val;
+      else if (k === 'v1') v1 = val;
+    });
+    if (!ts || !v1) return false;
+    const id = String(dataId == null ? '' : dataId).toLowerCase();
+    const manifest = 'id:' + id + ';request-id:' + xReqId + ';ts:' + ts + ';';
+    const esperada = crypto.createHmac('sha256', chave).update(manifest).digest('hex');
     const a = Buffer.from(esperada);
-    const b = Buffer.from(String(recebida));
+    const b = Buffer.from(String(v1));
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   } catch (e) { return false; }
 }
 
-/* Anti-replay: o evento precisa recair numa janela curta de tempo. Sem
-   isso, um payload capturado em trânsito pode ser reenviado à vontade. */
+/* Anti-replay: o ts da assinatura precisa recair numa janela curta de
+   tempo. Sem isso, um payload capturado em trânsito pode ser reenviado. */
 const WEBHOOK_TOLERANCIA_MS = 5 * 60 * 1000;
-function timestampEventoValido(ev) {
+function tsAssinaturaValido(req) {
   try {
-    const dados = (ev && ev.data) || {};
-    const cand = [dados.timestamp, dados.date, ev.timestamp, ev.date];
-    for (const t of cand) {
-      if (t === undefined || t === null || t === '') continue;
-      const ms = typeof t === 'number' ? (t > 1e12 ? t : t * 1000) : Date.parse(t);
-      if (Number.isFinite(ms)) return Math.abs(Date.now() - ms) <= WEBHOOK_TOLERANCIA_MS;
-    }
-    /* Sem timestamp não dá para detectar replay — recusa (fail-closed). */
-    return false;
+    const xSig = req.headers['x-signature'];
+    if (!xSig) return false;
+    let ts = '';
+    String(xSig).split(',').forEach(parte => {
+      const i = parte.indexOf('=');
+      if (i >= 0 && parte.slice(0, i).trim() === 'ts') ts = parte.slice(i + 1).trim();
+    });
+    const seg = Number(ts);
+    if (!Number.isFinite(seg) || seg <= 0) return false;
+    const ms = seg > 1e12 ? seg : seg * 1000;
+    return Math.abs(Date.now() - ms) <= WEBHOOK_TOLERANCIA_MS;
   } catch (e) { return false; }
 }
 
-function handleWebhookAbacate(req, res, url) {
+function handleWebhookMercadoPago(req, res, url) {
   let corpo = '';
   let estourou = false;
   req.on('data', c => {
@@ -918,53 +933,40 @@ function handleWebhookAbacate(req, res, url) {
     if (corpo.length > 256 * 1024) { estourou = true; req.destroy(); }
   });
   req.on('error', () => { /* cliente abortou */ });
-  req.on('end', () => {
+  req.on('end', async () => {
     if (estourou) return;
-    /* [SEGURANÇA] FAIL-CLOSED. Antes a validação inteira vivia dentro de
-       `if (secretEnv)`: sem a variável configurada, NENHUMA checagem
-       acontecia e qualquer POST anônimo chegava a processarEventoWebhook,
-       que ativa o plano pago. Sem segredo configurado => 503 sempre. */
-    const secretEnv = chaveHmacWebhook();
-    if (!secretEnv) {
-      console.error('[webhook] ABACATEPAY_WEBHOOK_HMAC_SECRET/ABACATEPAY_WEBHOOK_SECRET não configurado — webhook rejeitado (fail-closed).');
+    /* [SEGURANÇA] FAIL-CLOSED. Sem a chave secreta configurada o webhook
+       responde 503 e NENHUM evento é processado — a ativação continua
+       funcionando pelo polling da tela Assinatura. */
+    if (!chaveWebhookMP()) {
+      console.error('[webhook] MERCADOPAGO_WEBHOOK_SECRET não configurado — webhook rejeitado (fail-closed).');
       return json(res, 503, { ok: false, error: 'Webhook não configurado.' });
-    }
-    var urlOk = false;
-    var hmacOk = false;
-    {
-      const secretUrl = url.searchParams.get('webhookSecret') || '';
-      if (secretUrl) {
-        /* [SEGURANÇA] Segredo em query string vaza em log de proxy, Referer
-           e histórico. Mantido por compatibilidade, mas avisado. */
-        console.warn('[webhook] autenticação por ?webhookSecret= está depreciada — migre para o header x-webhook-signature.');
-        const a = Buffer.from(secretEnv, 'utf8');
-        const b = Buffer.from(secretUrl, 'utf8');
-        urlOk = a.length === b.length && crypto.timingSafeEqual(a, b);
-      }
-      if (!urlOk) {
-        hmacOk = assinaturaValida(corpo, req.headers['x-webhook-signature']);
-      }
-      if (!urlOk && !hmacOk) {
-        return json(res, 401, { ok: false, error: 'Unauthorized' });
-      }
     }
     let ev;
     try { ev = JSON.parse(corpo || '{}'); }
     catch (e) { return json(res, 400, { ok: false, error: 'JSON inválido.' }); }
-    /* Anti-replay: rejeita evento com timestamp ausente ou fora da janela.
-       Uma assinatura válida de um payload antigo não pode reativar plano. */
-    if (!timestampEventoValido(ev)) {
-      console.warn('[webhook] evento sem timestamp válido — rejeitado (anti-replay).');
-      return json(res, 400, { ok: false, error: 'Evento expirado ou sem timestamp.' });
+
+    /* O id do pagamento pode vir no corpo (data.id) ou na query string. */
+    const dataId = (ev && ev.data && ev.data.id != null)
+      ? ev.data.id
+      : (url.searchParams.get('data.id') || url.searchParams.get('id') || '');
+
+    if (!assinaturaMPValida(req, dataId)) {
+      console.warn('[webhook] assinatura x-signature inválida — rejeitado.');
+      return json(res, 401, { ok: false, error: 'Unauthorized' });
+    }
+    if (!tsAssinaturaValido(req)) {
+      console.warn('[webhook] ts da assinatura fora da janela — rejeitado (anti-replay).');
+      return json(res, 400, { ok: false, error: 'Evento expirado.' });
     }
     try {
-      const r = API.processarEventoWebhook(ev);
+      const r = await Promise.resolve(API.processarEventoWebhook(ev));
       // [SEGURANÇA] Não logar dados do evento (podem conter PII)
-      console.log('[webhook] event=' + (ev.event || '?') + ' ok=' + !r.ignored);
+      console.log('[webhook] type=' + ((ev && (ev.type || ev.topic)) || '?') + ' ok=' + !r.ignored);
       return json(res, 200, { ok: true, data: r });
     } catch (e) {
       console.error('[webhook]', e);
-      /* 500 faz a AbacatePay retentar — o processamento é idempotente */
+      /* 500 faz o Mercado Pago retentar — o processamento é idempotente */
       return json(res, 500, { ok: false, error: 'Falha ao processar evento.' });
     }
   });
@@ -1098,8 +1100,8 @@ const server = http.createServer((req, res) => {
     return void handleSuperAdmin(req, res, pathname, url);
   }
   if (req.method === 'POST' && pathname === '/api/rpc') return handleRpc(req, res);
-  if (req.method === 'POST' && pathname === '/webhooks/abacatepay') {
-    return handleWebhookAbacate(req, res, url);
+  if (req.method === 'POST' && pathname === '/webhooks/mercadopago') {
+    return handleWebhookMercadoPago(req, res, url);
   }
   if (req.method === 'GET' || req.method === 'HEAD') return servirEstatico(req, res, url);
   res.writeHead(405);
@@ -1336,10 +1338,10 @@ function bancoRemoto() {
   } else {
     console.log('  E-mail (código)  : MODO DEMO — configure GMAIL_USER/GMAIL_PASS no painel do Render para o código chegar no e-mail.');
   }
-  console.log(process.env.ABACATEPAY_API_KEY
-    ? '  Pagamentos PIX   : AbacatePay (' +
-      (/^abc_/.test(process.env.ABACATEPAY_API_KEY) ? 'dev mode' : 'chave configurada') + ')'
-    : '  Pagamentos PIX   : MODO SIMULADO — configure ABACATEPAY_API_KEY no .env');
+  console.log(process.env.MERCADOPAGO_ACCESS_TOKEN
+    ? '  Pagamentos PIX   : Mercado Pago (' +
+      (/^TEST-/.test(process.env.MERCADOPAGO_ACCESS_TOKEN) ? 'sandbox/teste' : 'chave configurada') + ')'
+    : '  Pagamentos PIX   : MODO SIMULADO — configure MERCADOPAGO_ACCESS_TOKEN no .env');
   if (process.env.GEMINI_API_KEY) {
     console.log('  Atendente bot    : IA Gemini ativa (' + (process.env.GEMINI_MODEL || 'gemini-2.0-flash') + ')');
   } else {

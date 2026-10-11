@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const worker = new Worker('webhooks', async (job) => {
   const { payload, signature, timestamp } = job.data;
 
-  const secret = process.env.ABACATEPAY_WEBHOOK_SECRET;
+  const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
   const expectedSignature = crypto
     .createHmac('sha256', secret)
     .update(${timestamp}.)

@@ -1,6 +1,6 @@
 /* ============================================================
    Corte Comigo – admin/js/assinatura.js
-   Status da assinatura, troca de planos via PIX (AbacatePay)
+   Status da assinatura, troca de planos via PIX (Mercado Pago)
    e histórico de cobranças (RF-057..061, DT-12).
    ============================================================ */
 
@@ -300,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let cobrancaId = null;
   let timerPoll = null;
   let timerRelogio = null;
+  let pagamentoPendente = null;
 
   function pararTimers() {
     clearInterval(timerPoll);
@@ -359,6 +360,11 @@ function fecharPagamento() {
     setText('pg-plano', rotulo);
     setText('pg-valor', DB.fmtBRL(c.amount_cents / 100));
 
+    const docBox = document.getElementById('pg-doc-box');
+    const checkout = document.getElementById('pg-checkout');
+    if (docBox) docBox.hidden = true;
+    if (checkout) checkout.hidden = false;
+
     const qr = document.getElementById('pg-qrcode');
     const semqr = document.getElementById('pg-semqr');
     if (c.qr_base64) {
@@ -371,10 +377,8 @@ function fecharPagamento() {
     }
     document.getElementById('pg-codigo').value = c.br_code || '';
     const btnSim = document.getElementById('pg-simular');
-    const devAbacate = c.provider === 'abacatepay' && c.abacate_id;
-    btnSim.hidden = !(c.provider === 'demo' || devAbacate);
-    btnSim.textContent = devAbacate ? 'Simular pagamento (Dev mode)'
-                                    : 'Simular pagamento (modo teste)';
+    btnSim.hidden = c.provider !== 'demo';
+    btnSim.textContent = 'Simular pagamento (modo teste)';
     atualizarStatus(c);
     iniciarRelogio(c.expires_at);
 
@@ -397,13 +401,81 @@ function fecharPagamento() {
     abrirModal(modalPg);
   }
 
-  function abrirPagamento(plano, periodo, parcelas) {
-    let c;
-    try {
-      c = API.criarCobrancaPlano(plano.id, periodo || 'mensal', parcelas || 1, 'pix');
-    } catch (e) { showToast(msgErro(e), 'error'); return; }
-    mostrarCobranca(c, plano);
+  /* O Mercado Pago (PIX) exige o CPF/CNPJ do pagador (dono do salão) para
+     gerar a cobrança. Por isso o modal abre primeiro num passo de coleta do
+     documento e só depois chama a API para criar o PIX. */
+  function formatarDoc(v) {
+    const d = String(v || '').replace(/\D/g, '').slice(0, 14);
+    if (d.length <= 11) {
+      if (d.length > 9) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, '$1.$2.$3-$4');
+      if (d.length > 6) return d.replace(/(\d{3})(\d{3})(\d{1,3})/, '$1.$2.$3');
+      if (d.length > 3) return d.replace(/(\d{3})(\d{1,3})/, '$1.$2');
+      return d;
+    }
+    if (d.length > 12) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{1,2})/, '$1.$2.$3/$4-$5');
+    if (d.length > 8) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{1,4})/, '$1.$2.$3/$4');
+    if (d.length > 5) return d.replace(/(\d{2})(\d{3})(\d{1,3})/, '$1.$2.$3');
+    return d.replace(/(\d{2})(\d{1,3})/, '$1.$2');
   }
+
+  function abrirPagamento(plano, periodo, parcelas) {
+    pagamentoPendente = { plano, periodo: periodo || 'mensal', parcelas: parcelas || 1 };
+    const docBox = document.getElementById('pg-doc-box');
+    const checkout = document.getElementById('pg-checkout');
+    if (docBox) docBox.hidden = false;
+    if (checkout) checkout.hidden = true;
+    const erroEl = document.getElementById('pg-doc-erro');
+    if (erroEl) erroEl.textContent = '';
+    const titulo = document.getElementById('pg-titulo');
+    if (titulo) titulo.textContent = 'Pagar com PIX';
+    setText('pg-plano', 'Plano ' + plano.name + ' · ' + (periodo === 'anual' ? 'anual' : '30 dias'));
+    const valorAnual = plano.price_annual != null && Number(plano.price_annual) > 0
+      ? Number(plano.price_annual) : Number(plano.price_monthly) * 12;
+    setText('pg-valor', periodo === 'anual'
+      ? DB.fmtBRL(valorAnual) : DB.fmtBRL(Number(plano.price_monthly)));
+    const inp = document.getElementById('pg-doc');
+    if (inp) {
+      let salvo = '';
+      try { salvo = localStorage.getItem('cc_pagador_doc') || ''; } catch (e) { /* noop */ }
+      inp.value = salvo ? formatarDoc(salvo) : '';
+    }
+    abrirModal(modalPg);
+    if (inp) setTimeout(() => inp.focus(), 50);
+  }
+
+  function gerarPix() {
+    if (!pagamentoPendente) return;
+    const inp = document.getElementById('pg-doc');
+    const erroEl = document.getElementById('pg-doc-erro');
+    const digitos = String(inp ? inp.value : '').replace(/\D/g, '');
+    if (!(digitos.length === 11 || digitos.length === 14)) {
+      if (erroEl) erroEl.textContent = 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido do titular.';
+      if (inp) inp.focus();
+      return;
+    }
+    if (erroEl) erroEl.textContent = '';
+    try { localStorage.setItem('cc_pagador_doc', digitos); } catch (e) { /* noop */ }
+    const btn = document.getElementById('pg-gerar');
+    if (btn) { btn.disabled = true; btn.textContent = 'Gerando PIX…'; }
+    try {
+      const c = API.criarCobrancaPlano(
+        pagamentoPendente.plano.id, pagamentoPendente.periodo, pagamentoPendente.parcelas,
+        'pix', { cpfCnpj: digitos });
+      mostrarCobranca(c, pagamentoPendente.plano);
+    } catch (e) {
+      if (erroEl) erroEl.textContent = msgErro(e);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Gerar PIX'; }
+    }
+  }
+
+  document.getElementById('pg-gerar')?.addEventListener('click', gerarPix);
+  document.getElementById('pg-doc')?.addEventListener('input', e => {
+    e.target.value = formatarDoc(e.target.value);
+  });
+  document.getElementById('pg-doc')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); gerarPix(); }
+  });
 
   document.getElementById('btn-fechar-pagamento')?.addEventListener('click', fecharPagamento);
   modalPg?.addEventListener('click', e => {

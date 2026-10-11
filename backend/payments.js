@@ -1,41 +1,48 @@
 'use strict';
 /* ============================================================
    Corte Comigo – payments.js
-   Cobrança dos planos via AbacatePay.
+   Cobrança dos planos via Mercado Pago (PIX à vista).
 
    Métodos de pagamento:
-   • PIX (padrão) — QR Code + código copia-e-cola via transpare
-     AbacatePay (real na versão v2). Sem chave → PIX fake (demo).
-
-   • Com ABACATEPAY_API_KEY no .env → PIX real (Dev mode = sandbox)
-   • Sem chave → modo simulado local: gera um "PIX fake" e libera
-     confirmarCobrancaDemo() para testar o fluxo inteiro.
+   • PIX (somente) — QR Code + código copia-e-cola gerados pelo
+     próprio Mercado Pago (POST /v1/payments, payment_method_id=pix).
+   • Com MERCADOPAGO_ACCESS_TOKEN no .env → PIX real (token de teste
+     = sandbox). Sem chave → modo simulado local (PIX fake/demo).
 
    Confirmação do pagamento:
-   1. Polling — statusCobranca() consulta a AbacatePay (ou o
+   1. Polling — statusCobranca() consulta o Mercado Pago (ou o
       estado local, no modo demo) chamado pela tela Assinatura;
-   2. Webhook — server.js recebe POST /webhooks/abacatepay,
-      valida o secret/assinatura e chama processarEventoWebhook().
+   2. Webhook — server.js recebe POST /webhooks/mercadopago,
+      valida o header x-signature e chama processarEventoWebhook().
 
-Ao confirmar: subscription.status='ativa', plan_id do plano
-    pago e current_period_end estendido em +30 dias (mensal) ou
-    +365 dias (anual), a partir do fim do período vigente,
-    preservando trial em andamento. O total anual usa o preço
-    anual próprio do plano (price_annual) — não é 12× o mensal.
-    ============================================================ */
+   O PIX do Mercado Pago EXIGE os dados do pagador (payer): nome,
+   e-mail e CPF/CNPJ. Por isso a tela de Assinatura coleta o
+   documento do dono antes de gerar a cobrança.
+
+   Ao confirmar: subscription.status='ativa', plan_id do plano
+   pago e current_period_end estendido em +30 dias (mensal) ou
+   +365 dias (anual), a partir do fim do período vigente,
+   preservando trial em andamento. O total anual usa o preço
+   anual próprio do plano (price_annual) — não é 12× o mensal.
+   ============================================================ */
 
 (function () {
   const DB = window.DB;
   const Auth = window.Auth;
 
-  const URL_API = 'https://api.abacatepay.com/v2';
+  const URL_API = 'https://api.mercadopago.com';
   const EXPIRA_EM_SEG = 3600; // QR Code PIX válido por 1h
 
   function agoraISO() { return new Date().toISOString().slice(0, 16); }
   function agoraMsISO() { return new Date().toISOString(); }
 
   function chaveApi() {
-    return String(process.env.ABACATEPAY_API_KEY || '').trim();
+    return String(process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim();
+  }
+
+  function urlWebhook() {
+    const base = String(process.env.APP_URL || '').trim().replace(/\/+$/, '');
+    return base ? base + '/webhooks/mercadopago' : null;
   }
 
   /* [SEGURANÇA] Ambiente de produção. Sem isto, um erro de deploy
@@ -56,7 +63,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     return !String(process.env.NODE_ENV || '').trim();
   }
 
-  /* Cobrança real exige chave da AbacatePay. Sem isso, falhar alto em vez
+  /* Cobrança real exige chave do Mercado Pago. Sem isso, falhar alto em vez
      de gerar cobrança demo silenciosamente. */
   function exigirChaveParaCobrancaReal() {
     if (chaveApi()) return true;
@@ -96,7 +103,7 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
       provider: pag.provider,
       br_code: pag.br_code || '',
       qr_base64: pag.qr_base64 || '',
-      abacate_id: pag.abacate_id || null,
+      provider_id: pag.provider_id || null,
       dev_mode: pag.dev_mode === true,
       refunded_at: pag.refunded_at || null,
       refund_reason: pag.refund_reason || null,
@@ -143,36 +150,156 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
     return true;
   }
 
-  async function criarCobrancaAbacate(pag, plano) {
-    /* customer é opcional no PIX e EXIGE taxId quando informado —
-       como não coletamos CPF do dono, enviamos só o essencial */
-    const resp = await fetch(URL_API + '/transparents/create', {
+  /* ---------- validação de CPF/CNPJ do pagador ---------- */
+
+  function somenteDigitos(v) { return String(v == null ? '' : v).replace(/\D/g, ''); }
+
+  function cpfValido(cpf) {
+    if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+    let soma = 0;
+    for (let i = 0; i < 9; i++) soma += Number(cpf[i]) * (10 - i);
+    let d1 = (soma * 10) % 11; if (d1 === 10) d1 = 0;
+    if (d1 !== Number(cpf[9])) return false;
+    soma = 0;
+    for (let i = 0; i < 10; i++) soma += Number(cpf[i]) * (11 - i);
+    let d2 = (soma * 10) % 11; if (d2 === 10) d2 = 0;
+    return d2 === Number(cpf[10]);
+  }
+
+  function cnpjValido(cnpj) {
+    if (!/^\d{14}$/.test(cnpj) || /^(\d)\1{13}$/.test(cnpj)) return false;
+    const calc = (base) => {
+      const pesos = base.length === 12
+        ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+      let soma = 0;
+      for (let i = 0; i < base.length; i++) soma += Number(base[i]) * pesos[i];
+      const r = soma % 11;
+      return r < 2 ? 0 : 11 - r;
+    };
+    const d1 = calc(cnpj.slice(0, 12));
+    if (d1 !== Number(cnpj[12])) return false;
+    const d2 = calc(cnpj.slice(0, 13));
+    return d2 === Number(cnpj[13]);
+  }
+
+  /**
+   * Normaliza o documento do pagador (obrigatório no PIX do Mercado
+   * Pago). Aceita CPF (11 dígitos) ou CNPJ (14 dígitos), com ou sem
+   * máscara. Lança 400 com mensagem clara quando inválido.
+   */
+  function normalizarDocumento(pagador) {
+    const num = somenteDigitos(pagador && (pagador.cpfCnpj || pagador.documento));
+    if (num.length === 11 && cpfValido(num)) return { tipo: 'CPF', numero: num };
+    if (num.length === 14 && cnpjValido(num)) return { tipo: 'CNPJ', numero: num };
+    throw {
+      status: 400, code: 'documento_invalido',
+      error: 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido do titular que assina o plano.'
+    };
+  }
+
+  /* O Mercado Pago pede nome separado em first_name/last_name. Usa a
+     primeira palavra como nome e o restante como sobrenome (fallback
+     para o próprio nome quando só há uma palavra). */
+  function nomePayer(nomeCompleto) {
+    const partes = String(nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
+    if (!partes.length) return { first: 'Cliente', last: 'Corte Comigo' };
+    const first = partes[0].slice(0, 60);
+    let last = partes.slice(1).join(' ').slice(0, 60);
+    if (!last) last = first;
+    return { first, last };
+  }
+
+  /* Formata a expiração no padrão do Mercado Pago (ISO 8601 com offset
+     de São Paulo, UTC-3 o ano inteiro desde 2019). */
+  function dataExpiracaoISO(segundos) {
+    const offsetMin = -180;
+    const local = new Date(Date.now() + offsetMin * 60000 + segundos * 1000);
+    const p = n => String(n).padStart(2, '0');
+    return local.getUTCFullYear() + '-' + p(local.getUTCMonth() + 1) + '-' + p(local.getUTCDate()) +
+      'T' + p(local.getUTCHours()) + ':' + p(local.getUTCMinutes()) + ':' + p(local.getUTCSeconds()) +
+      '.000-03:00';
+  }
+
+  /* ---------- Mercado Pago ---------- */
+
+  function erroMP(corpo, resp) {
+    const msg = (corpo && (corpo.message || corpo.error || corpo.cause)) ||
+      ('HTTP ' + (resp && resp.status));
+    return typeof msg === 'string' ? msg : JSON.stringify(msg);
+  }
+
+  async function criarCobrancaMercadoPago(pag, plano, dono, shop, pagador) {
+    const doc = normalizarDocumento(pagador);
+    const email = String((dono && dono.email) || (shop && shop.email) || '').trim();
+    if (!email) {
+      throw {
+        status: 409, code: 'sem_email',
+        error: 'Cadastre um e-mail na sua conta para gerar a cobrança do plano.'
+      };
+    }
+    const nome = nomePayer(dono && dono.name);
+    const anual = (pag.billing_period || 30) === 365;
+    const body = {
+      transaction_amount: Math.round(Number(pag.amount_cents)) / 100,
+      description: 'Corte Comigo — Plano ' + plano.name + ' (' + (anual ? 'anual' : '30 dias') + ')',
+      payment_method_id: 'pix',
+      external_reference: 'cc_pay_' + pag.id,
+      date_of_expiration: dataExpiracaoISO(EXPIRA_EM_SEG),
+      payer: {
+        email: email,
+        first_name: nome.first,
+        last_name: nome.last,
+        identification: { type: doc.tipo, number: doc.numero }
+      }
+    };
+    const notif = urlWebhook();
+    if (notif) body.notification_url = notif;
+
+    const resp = await fetch(URL_API + '/v1/payments', {
       method: 'POST',
       headers: {
         'Authorization': 'Bearer ' + chaveApi(),
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Idempotency-Key': 'cc_pay_' + pag.id
       },
-      body: JSON.stringify({
-        method: 'PIX',
-        data: {
-          amount: pag.amount_cents,
-          expiresIn: EXPIRA_EM_SEG,
-          description: 'Corte Comigo — Plano ' + plano.name + ' (' +
-            ((pag.billing_period || 30) === 365 ? 'anual' : '30 dias') + ')',
-          externalId: 'cc_pay_' + pag.id,
-          metadata: { payment_db_id: String(pag.id), barbershop_id: String(pag.barbershop_id), plan_id: String(pag.plan_id) }
-        }
-      })
+      body: JSON.stringify(body)
     });
     let corpo = null;
     try { corpo = await resp.json(); } catch (e) { /* resposta não-JSON */ }
-    if (!resp.ok || !corpo || corpo.success !== true || !corpo.data) {
-      const motivo = (corpo && (corpo.error && (corpo.error.message || corpo.error))) ||
-        ('HTTP ' + resp.status);
-      console.error('[payments] AbacatePay recusou a cobrança:', motivo);
-      throw { status: 502, error: 'Falha ao gerar o PIX na AbacatePay (' + motivo + '). Tente novamente.' };
+    if (!resp.ok || !corpo || !corpo.id) {
+      const motivo = erroMP(corpo, resp);
+      console.error('[payments] Mercado Pago recusou a cobrança:', motivo);
+      throw { status: 502, error: 'Falha ao gerar o PIX no Mercado Pago (' + motivo + '). Tente novamente.' };
     }
-    return corpo.data;
+    const tdata = (corpo.point_of_interaction && corpo.point_of_interaction.transaction_data) || {};
+    return {
+      id: String(corpo.id),
+      br_code: tdata.qr_code || '',
+      qr_base64: tdata.qr_code_base64 ? ('data:image/png;base64,' + tdata.qr_code_base64) : '',
+      expires_at: corpo.date_of_expiration || pag.expires_at,
+      dev_mode: /^TEST-/.test(chaveApi())
+    };
+  }
+
+  /** GET do pagamento no Mercado Pago (fonte da verdade do status). */
+  async function consultarMercadoPago(paymentId) {
+    try {
+      const resp = await fetch(
+        URL_API + '/v1/payments/' + encodeURIComponent(paymentId),
+        { headers: { 'Authorization': 'Bearer ' + chaveApi() } });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (e) { return null; }
+  }
+
+  /** Traduz o status do Mercado Pago para o ciclo interno. */
+  function situacaoMercadoPago(det) {
+    const s = String((det && det.status) || '').toLowerCase();
+    if (s === 'approved') return 'PAID';
+    if (s === 'refunded' || s === 'charged_back') return 'REFUNDED';
+    if (s === 'rejected' || s === 'cancelled') return 'CANCELLED';
+    return null; /* pending / in_process / authorized → ainda pendente */
   }
 
   /* ================= API pública ================= */
@@ -182,10 +309,13 @@ Ao confirmar: subscription.status='ativa', plan_id do plano
    * cobrança pendente ainda válida da mesma loja+plano+período.
    *
    * periodo: 'mensal' (padrão, 30 dias) | 'anual' (365 dias,
-   * cobrança de 12× o valor mensal). A opção de parcelar só é
-   * aceita no período anual (parcelas de 1 a 12).
+   * cobrança do preço anual do plano). A opção de parcelar continua
+   * aceita apenas como registro no anual.
+   *
+   * pagador: { cpfCnpj } — CPF/CNPJ do titular (obrigatório no
+   * Mercado Pago).
    */
-async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
+  async function montarCobranca(shopId, planId, periodo, parcelas, metodo, pagador) {
     const db = DB._d();
 
     const plano = db.plans.find(p => p.id == planId);
@@ -248,21 +378,23 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
       amount_cents: totalCents,
       metodo: mtd,
       status: 'pending',
-      provider: exigirChaveParaCobrancaReal() ? 'abacatepay' : 'demo',
-      abacate_id: null,
+      provider: exigirChaveParaCobrancaReal() ? 'mercadopago' : 'demo',
+      provider_id: null,
       br_code: '',
       qr_base64: '',
       created_at: agoraISO(),
       expires_at: new Date(Date.now() + EXPIRA_EM_SEG * 1000).toISOString()
     };
 
-    if (pag.provider === 'abacatepay') {
-      const d = await criarCobrancaAbacate(pag, plano);
-      pag.abacate_id = d.id;
-      pag.br_code = d.brCode || '';
-      pag.qr_base64 = d.brCodeBase64 || '';
-      pag.expires_at = d.expiresAt || pag.expires_at;
-      pag.dev_mode = d.devMode === true; /* sandbox → permite simular pagamento */
+    if (pag.provider === 'mercadopago') {
+      const dono = db.users.find(u => u.id === (db.barbershops.find(b => b.id === shopId) || {}).owner_user_id);
+      const shop = db.barbershops.find(b => b.id === shopId);
+      const d = await criarCobrancaMercadoPago(pag, plano, dono, shop, pagador);
+      pag.provider_id = d.id;
+      pag.br_code = d.br_code;
+      pag.qr_base64 = d.qr_base64;
+      pag.expires_at = d.expires_at || pag.expires_at;
+      pag.dev_mode = d.dev_mode === true;
     } else {
       /* modo simulado — código PIX inválido apenas ilustrativo */
       pag.br_code = '00020126BR.GOV.BCB.PIX01CORTECOMIGO-DEMO520400005303986' +
@@ -276,11 +408,12 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
 
   /**
    * Cria a cobrança do dono logado (wrapper de sessão sobre montarCobranca).
-   * periodo: 'mensal' (padrão, 30 dias) | 'anual' (365 dias, parcelável).
+   * periodo: 'mensal' (padrão, 30 dias) | 'anual' (365 dias).
+   * pagador: { cpfCnpj } — CPF/CNPJ do titular que assina.
    */
-  async function criarCobrancaPlano(planId, periodo, parcelas, metodo) {
+  async function criarCobrancaPlano(planId, periodo, parcelas, metodo, pagador) {
     const { shop } = exigirDonoLocal();
-    return montarCobranca(shop.id, planId, periodo, parcelas, metodo);
+    return montarCobranca(shop.id, planId, periodo, parcelas, metodo, pagador);
   }
 
   /**
@@ -337,36 +470,31 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
       return pagamentoPublico(pag);
     }
 
-    if (pag.provider === 'abacatepay' && pag.abacate_id) {
-      const situacao = await consultarAbacate(pag.abacate_id);
+    if (pag.provider === 'mercadopago' && pag.provider_id) {
+      const det = await consultarMercadoPago(pag.provider_id);
+      const situacao = situacaoMercadoPago(det);
       if (situacao === 'PAID') aplicarPagamento(pag);
-      else if (situacao === 'EXPIRED' || situacao === 'CANCELLED') {
-        pag.status = situacao === 'EXPIRED' ? 'expired' : 'cancelled';
+      else if (situacao === 'REFUNDED') {
+        pag.refunded_at = agoraMsISO();
+        pag.refund_reason = 'mercadopago';
+        pag.refund_id = pag.provider_id;
+        DB.salvar();
+        recalcularPeriodoAposEstorno(pag.barbershop_id);
+      } else if (situacao === 'CANCELLED') {
+        pag.status = 'cancelled';
         DB.salvar();
       }
     }
     return pagamentoPublico(pag);
   }
 
-  /** GET do status na AbacatePay (endpoint oficial de consulta). */
-  async function consultarAbacate(chargeId) {
-    try {
-      const resp = await fetch(
-        URL_API + '/transparents/check?id=' + encodeURIComponent(chargeId),
-        { headers: { 'Authorization': 'Bearer ' + chaveApi() } });
-      if (!resp.ok) return null;
-      const corpo = await resp.json();
-      return (corpo && corpo.data && corpo.data.status) || null;
-    } catch (e) { return null; }
-  }
-
   /**
    * Modo simulado: confirma uma cobrança demo pendente.
-   * Nunca afeta cobranças reais (provider 'abacatepay').
+   * Nunca afeta cobranças reais (provider 'mercadopago').
    */
   function confirmarCobrancaDemo(paymentId) {
     /* [SEGURANÇA] Uma cobrança demo NÃO pode ativar plano pago.
-       Antes bastava faltar ABACATEPAY_API_KEY no .env (erro comum de
+       Antes bastava faltar a chave no .env (erro comum de
        deploy) para o próprio dono "pagar" e liberar o plano premium.
        Em produção isso é dinheiro que não entra. */
     if (ambienteProducao()) {
@@ -391,33 +519,31 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
   }
 
   /**
-   * Estorno integral na AbacatePay (cobrança transparente).
-   * Só devolve sucesso quando a AbacatePay confirma o reembolso
-   * (refundPublicId). Lança erro -> 502 quando recusado.
+   * Estorno integral no Mercado Pago.
+   * Só devolve sucesso quando o Mercado Pago confirma o reembolso.
+   * Lança erro -> 502 quando recusado.
    */
-  async function estornarNaAbacate(pag) {
-    const resp = await fetch(URL_API + '/transparents/refund', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + chaveApi(),
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        id: pag.abacate_id,
-        reason: 'Arrependimento de compra online (CDC art. 49 — 7 dias).'
-      })
-    });
+  async function estornarNoMercadoPago(pag) {
+    const resp = await fetch(
+      URL_API + '/v1/payments/' + encodeURIComponent(pag.provider_id) + '/refunds', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + chaveApi(),
+          'Content-Type': 'application/json',
+          'X-Idempotency-Key': 'cc_refund_' + pag.id
+        },
+        body: JSON.stringify({})
+      });
     let corpo = null;
     try { corpo = await resp.json(); } catch (e) { /* resposta não-JSON */ }
-    if (!resp.ok || !corpo || corpo.success !== true || !corpo.data) {
-      const motivo = (corpo && (corpo.error || (corpo.data && (corpo.data.error || '')))) ||
-        ('HTTP ' + resp.status);
+    if (!resp.ok || !corpo || !corpo.id) {
+      const motivo = erroMP(corpo, resp);
       throw {
         status: 502, code: 'estorno_recusado',
-        error: 'A AbacatePay recusou o estorno (' + motivo + '). Nenhuma cobrança foi alterada.'
+        error: 'O Mercado Pago recusou o estorno (' + motivo + '). Nenhuma cobrança foi alterada.'
       };
     }
-    return (corpo.data && (corpo.data.refundPublicId || corpo.data.id)) || null;
+    return String(corpo.id);
   }
 
   /**
@@ -430,9 +556,9 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
    * • só cobranças 'paid' (dinheiro de fato recebido);
    * • janela de 7 dias contada a partir de paid_at;
    * • estorno idempotente (refunded_at) — nunca estorna 2×;
-   * • cobrança real (abacatepay) só vira "estornada" se a AbacatePay
-   *   confirmar o reembolso (estornarNaAbacate); caso contrário,
-   *   lança erro e nada é alterado;
+   * • cobrança real (mercadopago) só vira "estornada" se o Mercado
+   *   Pago confirmar o reembolso (estornarNoMercadoPago); caso
+   *   contrário, lança erro e nada é alterado;
    * • ao estornar, recalcula o período pago da assinatura para
    *   revogar os dias devolvidos (recalcularPeriodoAposEstorno).
    */
@@ -456,9 +582,9 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     }
 
     let refund_id = null;
-    if (pag.provider === 'abacatepay') {
-      if (!pag.abacate_id) throw { status: 409, code: 'sem_abacate_id', error: 'Cobrança sem referência na AbacatePay — entre em contato.' };
-      refund_id = await estornarNaAbacate(pag);
+    if (pag.provider === 'mercadopago') {
+      if (!pag.provider_id) throw { status: 409, code: 'sem_provider_id', error: 'Cobrança sem referência no Mercado Pago — entre em contato.' };
+      refund_id = await estornarNoMercadoPago(pag);
     }
 
     pag.refunded_at = agoraMsISO();
@@ -561,57 +687,25 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
     DB.salvar();
   }
 
-  /** Dispara a simulação de pagamento na AbacatePay (só dev mode).
-      Exige Content-Type json com corpo vazio — sem isso a API
-      responde 400 "Pix QR Code not found". Requer CHECKOUT:READ. */
-  async function simularNaAbacate(chargeId) {
-    try {
-      const resp = await fetch(
-        URL_API + '/transparents/simulate-payment?id=' + encodeURIComponent(chargeId),
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + chaveApi(),
-            'Content-Type': 'application/json'
-          },
-          body: ''
-        });
-      if (!resp.ok) return null;
-      const corpo = await resp.json();
-      return corpo && corpo.data ? corpo.data : null;
-    } catch (e) { return null; }
-  }
-
   /**
    * Confirma uma cobrança pendente para testes:
    * • provider demo → ativa localmente;
-   * • provider abacatepay → pede à própria AbacatePay para simular
-   *   o pagamento (endpoint oficial de Dev mode; com chave de
-   *   produção a API recusa e devolvemos o erro).
+   * • provider mercadopago → o Mercado Pago NÃO oferece endpoint de
+   *   simulação de PIX (o pagamento é feito por um usuário de teste
+   *   no app do banco). Devolvemos erro explicativo.
    */
   async function simularPagamento(paymentId) {
     const { shop } = exigirDonoLocal();
     const pag = DB._d().payments.find(p => p.id == paymentId && p.barbershop_id === shop.id);
     if (!pag) throw { status: 404, error: 'Cobrança não encontrada.' };
     if (pag.provider === 'demo') return confirmarCobrancaDemo(paymentId);
-    if (!chaveApi()) throw { status: 409, error: 'Sem chave da AbacatePay configurada.' };
-    if (pag.provider !== 'abacatepay' || !pag.abacate_id) {
-      throw { status: 409, error: 'Cobrança inválida para simulação.' };
-    }
-    if (pag.status !== 'pending') throw { status: 409, error: 'Cobrança já processada.' };
-
-    const resultado = await simularNaAbacate(pag.abacate_id);
-    let situacao = (resultado && resultado.status) || null;
-    if (situacao !== 'PAID') situacao = await consultarAbacate(pag.abacate_id);
-    if (situacao === 'PAID') {
-      aplicarPagamento(pag);
-    } else {
+    if (pag.provider === 'mercadopago') {
       throw {
-        status: 502,
-        error: 'A AbacatePay recusou a simulação — confirme que a chave é de Dev mode.'
+        status: 409, code: 'sem_simulacao_mp',
+        error: 'O Mercado Pago não permite simular o PIX pela API. Em teste, pague o QR Code com um usuário de teste; em produção, o pagamento é confirmado automaticamente.'
       };
     }
-    return pagamentoPublico(pag);
+    throw { status: 409, error: 'Cobrança inválida para simulação.' };
   }
 
   /** Histórico real de cobranças da loja (mais recentes primeiro). */
@@ -624,26 +718,31 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
   }
 
   /**
-   * Webhook da AbacatePay (server.js valida secret/HMAC antes).
-   * Idempotente: eventos repetidos não duplicam ativação nem estorno.
+   * Webhook do Mercado Pago (server.js valida x-signature antes).
+   * O evento só traz o id; reconfirmamos o pagamento na API (fonte
+   * da verdade) antes de ativar ou estornar. Idempotente.
    */
-  function processarEventoWebhook(ev) {
-    const tipo = String((ev && ev.event) || '');
+  async function processarEventoWebhook(ev) {
+    const tipo = String((ev && (ev.type || ev.topic)) || '');
+    const acao = String((ev && ev.action) || '');
     const dados = (ev && ev.data) || {};
-    const PAGOS = ['transparent.completed', 'checkout.completed',
-      'pix.paid', 'billing.paid', 'subscription.renewed'];
-    const ESTORNADOS = ['transparent.refunded', 'checkout.refunded', 'subscription.refunded'];
+    const mpId = (dados && dados.id != null) ? String(dados.id) : '';
+    if (tipo !== 'payment' && !/^payment\./.test(acao)) {
+      return { ignored: true, event: tipo || acao };
+    }
+    if (!mpId) return { ignored: true, motivo: 'sem_payment_id' };
 
-    let pag = null;
+    const det = await consultarMercadoPago(mpId);
     const db = DB._d();
-    if (dados.metadata && dados.metadata.payment_db_id != null) {
-      pag = db.payments.find(p => p.id == String(dados.metadata.payment_db_id));
+    let pag = db.payments.find(p => String(p.provider_id) === mpId);
+    if (!pag && det && det.external_reference) {
+      const m = /^cc_pay_(.+)$/.exec(String(det.external_reference));
+      if (m) pag = db.payments.find(p => String(p.id) === String(m[1]));
     }
-    if (!pag && dados.id) {
-      pag = db.payments.find(p => p.abacate_id === dados.id);
-    }
-    if (PAGOS.includes(tipo)) {
-      if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
+    if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
+
+    const situacao = situacaoMercadoPago(det);
+    if (situacao === 'PAID') {
       /* [SEGURANÇA] Uma cobrança já estornada não pode ser reativada por
          um evento de pagamento posterior ou repetido. */
       if (pag.refunded_at) {
@@ -651,9 +750,9 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
         return { ignored: true, motivo: 'cobranca_estornada' };
       }
       /* [SEGURANÇA] Confere o valor informado no evento contra o valor
-        cobrado. Divergência indica evento forjado ou recombination. */
-      if (dados.amount != null && pag.amount_cents != null) {
-        const valorCents = Math.round(Number(dados.amount) * 100);
+         cobrado. Divergência indica evento forjado ou recombination. */
+      if (det && det.transaction_amount != null && pag.amount_cents != null) {
+        const valorCents = Math.round(Number(det.transaction_amount) * 100);
         if (Number.isFinite(valorCents) && valorCents !== Math.round(Number(pag.amount_cents))) {
           console.error('[webhook] valor divergente para ' + pag.id + ' — ativacao bloqueada');
           return { ignored: true, motivo: 'valor_divergente' };
@@ -662,18 +761,24 @@ async function montarCobranca(shopId, planId, periodo, parcelas, metodo) {
       const mudou = aplicarPagamento(pag);
       return { ok: true, payment_db_id: pag.id, applied: mudou };
     }
-    if (ESTORNADOS.includes(tipo)) {
-      if (!pag) return { ignored: true, motivo: 'cobranca_desconhecida' };
+    if (situacao === 'REFUNDED') {
       if (!pag.refunded_at) {
         pag.refunded_at = agoraMsISO();
-        pag.refund_reason = 'webhook_abacatepay';
-        pag.refund_id = (dados && (dados.refundPublicId || dados.id)) || null;
+        pag.refund_reason = 'webhook_mercadopago';
+        pag.refund_id = mpId;
         DB.salvar();
         recalcularPeriodoAposEstorno(pag.barbershop_id);
       }
       return { ok: true, payment_db_id: pag.id, refunded: true };
     }
-    return { ignored: true, event: tipo };
+    if (situacao === 'CANCELLED') {
+      if (pag.status === 'pending') {
+        pag.status = 'cancelled';
+        DB.salvar();
+      }
+      return { ok: true, payment_db_id: pag.id, cancelled: true };
+    }
+    return { ignored: true, motivo: 'status_' + ((det && det.status) || 'desconhecido') };
   }
 
   function err400(msg) { throw { status: 400, error: msg }; }

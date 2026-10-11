@@ -80,14 +80,18 @@ async function main() {
   const pgReadonlyPass = await pergunta(rl, 'Senha do usuário readonly [cortecerto_readonly]: ') || pgAppPass;
   const pgAdminPass = await pergunta(rl, 'Senha do usuário admin (schema) [cortecerto_admin]: ') || pgAppPass;
 
-  // 6. AbacatePay
-  console.log('\n--- AbacatePay (Pagamentos) ---');
-  const abacateApiKey = await pergunta(rl, 'ABACATEPAY_API_KEY (obrigatório em produção): ');
-  const abacateWebhookSecret = await pergunta(rl, 'ABACATEPAY_WEBHOOK_HMAC_SECRET (obrigatório): ');
-  if (!abacateApiKey || !abacateWebhookSecret) {
-    console.error('❌ Chaves da AbacatePay são obrigatórias para produção.');
+  // 6. Mercado Pago
+  console.log('\n--- Mercado Pago (Pagamentos) ---');
+  const mpAccessToken = await pergunta(rl, 'MERCADOPAGO_ACCESS_TOKEN (obrigatório em produção): ');
+  if (!mpAccessToken) {
+    console.error('❌ Access Token do Mercado Pago é obrigatório para produção.');
     process.exit(1);
   }
+  const mpWebhookSecret = await pergunta(rl, 'MERCADOPAGO_WEBHOOK_SECRET (painel → Webhooks; vazio = webhook desativado/fail-closed): ');
+  if (!mpWebhookSecret) {
+    console.log('⚠️  Sem MERCADOPAGO_WEBHOOK_SECRET o webhook responde 503. A ativação continua pelo polling da tela.');
+  }
+  const mpPublicKey = await pergunta(rl, 'MERCADOPAGO_PUBLIC_KEY (opcional): ');
 
   // 7. Gmail/SMTP
   console.log('\n--- Gmail / SMTP (E-mails) ---');
@@ -134,10 +138,10 @@ PGDATABASE=${pgDatabase}
 PGSSL_STRICT=
 TZ=America/Sao_Paulo
 
-# === AbacatePay ===
-ABACATEPAY_API_KEY=${abacateApiKey}
-ABACATEPAY_WEBHOOK_HMAC_SECRET=${abacateWebhookSecret}
-ABACATEPAY_WEBHOOK_SECRET=${abacateWebhookSecret}
+# === Mercado Pago ===
+MERCADOPAGO_ACCESS_TOKEN=${mpAccessToken}
+MERCADOPAGO_WEBHOOK_SECRET=${mpWebhookSecret}
+MERCADOPAGO_PUBLIC_KEY=${mpPublicKey}
 
 # === Gmail Email via Nodemailer ===
 GMAIL_USER=${gmailUser}
@@ -205,11 +209,11 @@ PORT=3000
   console.log('  SUPER_ADMIN_HASH        ✅');
   console.log('  MIGRATION_DATABASE_URL  ✅');
   console.log('  DATABASE_URL            ✅');
-  console.log('  ABACATEPAY_API_KEY      ✅');
-  console.log('  ABACATEPAY_WEBHOOK_HMAC_SECRET ✅');
+  console.log('  MERCADOPAGO_ACCESS_TOKEN ✅');
+  console.log('  MERCADOPAGO_WEBHOOK_SECRET ' + (mpWebhookSecret ? '✅' : '⚠️  (webhook fail-closed)'));
   console.log('  GMAIL_USER / GMAIL_PASS ' + (gmailUser && gmailPass ? '✅' : '⚠️  (não configurado)'));
   console.log('\nPróximos passos:');
-  console.log('1. Configure o webhook na AbacatePay apontando para ' + appUrl + '/webhook/abacatepay?webhookSecret=SEU_SEGREDO');
+  console.log('1. No painel do Mercado Pago, configure o webhook em ' + appUrl + '/webhooks/mercadopago (evento "Pagamentos").');
   console.log('2. Inicie o servidor: npm start');
   console.log('3. Acesse ' + appUrl + '/super-admin para o painel do super-admin');
   console.log('4. Login: ' + superAdminEmail + ' / (sua senha)');

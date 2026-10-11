@@ -9,7 +9,7 @@
    devolvido, mas a cobrança original ainda existiu):
      • refunded_at    – quando o estorno foi processado
      • refund_reason  – motivo (ex.: arrependimento_cdc49)
-     • refund_id      – id público do reembolso na AbacatePay
+     • refund_id      – id público do reembolso no Mercado Pago
    ============================================================ */
 
 exports.up = async function (knex) {
