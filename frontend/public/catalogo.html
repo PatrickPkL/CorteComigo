@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <base href="/public/">
-<link rel="icon" type="image/jpeg" href="assets/cortecomigologo.jpg">
-<title>Encontre uma barbearia · Corte Comigo</title>
+<link rel="icon" type="image/png" href="/CCPNG.png">
+<title>Encontre uma barbearia Â· Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -16,55 +16,55 @@
 <header class="public-header">
   <a href="/" class="brand" style="text-decoration:none;color:inherit;">Corte<span>Comigo</span></a>
   <nav class="public-nav">
-    <a href="/catalogo">Catálogo</a>
+    <a href="/catalogo">CatÃ¡logo</a>
     <a href="/#planos">Planos</a>
     <span id="nav-auth" class="nav-auth-slot"></span>
-    <a href="/login">Sou dono de salão</a>
+    <a href="/login">Sou dono de salÃ£o</a>
   </nav>
 </header>
 
 <main class="public-main">
   <div class="public-hero">
-    <span class="eyebrow">Catálogo</span>
+    <span class="eyebrow">CatÃ¡logo</span>
     <h1>Encontre a sua barbearia</h1>
-    <p>Veja as barbearias e salões cadastrados, escolha o serviço e agende direto pelo site.</p>
+    <p>Veja as barbearias e salÃµes cadastrados, escolha o serviÃ§o e agende direto pelo site.</p>
 
     <div class="public-search">
       <div class="search-box" style="position:relative;">
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="busca-salao" placeholder="Buscar por salão, serviço ou profissional..." autocomplete="off">
+        <input type="text" id="busca-salao" placeholder="Buscar por salÃ£o, serviÃ§o ou profissional..." autocomplete="off">
         <div id="sugestoes" hidden></div>
       </div>
       <select id="filtro-cidade">
         <option value="">Todas as cidades</option>
       </select>
       <select id="filtro-servico">
-        <option value="">Todos os serviços</option>
+        <option value="">Todos os serviÃ§os</option>
       </select>
     </div>
-    <button type="button" class="btn btn-outline" id="btn-proximas" style="margin-top:8px;">📍 Lojas perto de mim</button>
+    <button type="button" class="btn btn-outline" id="btn-proximas" style="margin-top:8px;">ðŸ“ Lojas perto de mim</button>
   </div>
 
   <div class="salon-grid" id="grid-saloes"></div>
 
-  <nav class="pagination" id="pagination" aria-label="Paginação do catálogo"></nav>
+  <nav class="pagination" id="pagination" aria-label="PaginaÃ§Ã£o do catÃ¡logo"></nav>
 
   <div class="empty-state" id="estado-vazio" style="display:none;">
     <h3>Nenhuma barbearia encontrada</h3>
-    <p>Tente mudar a cidade, o serviço ou o termo de busca.</p>
+    <p>Tente mudar a cidade, o serviÃ§o ou o termo de busca.</p>
   </div>
 </main>
 
 <div class="consent-banner" id="consent-banner" role="dialog" aria-live="polite" hidden>
   <p class="consent-banner-texto">
-    Para encontrar barbearias perto de você, o Corte Comigo gostaria de acessar sua
-    localização. Você pode revogar este acesso a qualquer momento nas configurações
+    Para encontrar barbearias perto de vocÃª, o Corte Comigo gostaria de acessar sua
+    localizaÃ§Ã£o. VocÃª pode revogar este acesso a qualquer momento nas configuraÃ§Ãµes
     do navegador. Saiba mais na nossa
-    <a href="/privacidade" target="_blank" rel="noopener">Política de Privacidade</a>.
+    <a href="/privacidade" target="_blank" rel="noopener">PolÃ­tica de Privacidade</a>.
   </p>
   <div class="consent-banner-acoes">
-    <button type="button" class="btn btn-outline" id="btn-negar-geo">Agora não</button>
-    <button type="button" class="btn btn-brass" id="btn-aceitar-geo">Permitir localização</button>
+    <button type="button" class="btn btn-outline" id="btn-negar-geo">Agora nÃ£o</button>
+    <button type="button" class="btn btn-brass" id="btn-aceitar-geo">Permitir localizaÃ§Ã£o</button>
   </div>
 </div>
 <script src="../shared/js/db.js"></script>
@@ -74,13 +74,14 @@
 <script src="js/chatbot.js"></script>
 <footer style="text-align:center;padding:16px 12px;margin-top:24px;border-top:1px solid var(--line);">
   <p style="font-size:11px;color:var(--text-muted);margin:0;">
-    <a href="/privacidade" style="color:var(--text-muted);text-decoration:none;">Política de Privacidade</a>
-    <span style="opacity:0.5;margin:0 6px;">·</span>
+    <a href="/privacidade" style="color:var(--text-muted);text-decoration:none;">PolÃ­tica de Privacidade</a>
+    <span style="opacity:0.5;margin:0 6px;">Â·</span>
     <a href="/termos" style="color:var(--text-muted);text-decoration:none;">Termos de Uso</a>
-    <span style="opacity:0.5;margin:0 6px;">·</span>
+    <span style="opacity:0.5;margin:0 6px;">Â·</span>
     <a href="/lgpd" style="color:var(--text-muted);text-decoration:none;">Seus Direitos (LGPD)</a>
   </p>
-  <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0;opacity:0.6;">© 2026 Corte Comigo — LGPD (Lei 13.709/2018)</p>
+  <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0;opacity:0.6;">Â© 2026 Corte Comigo â€” LGPD (Lei 13.709/2018)</p>
 </footer>
 </body>
 </html>
+

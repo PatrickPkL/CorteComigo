@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <base href="/public/">
-<link rel="icon" type="image/jpeg" href="assets/cortecomigologo.jpg">
-<title>Barbearia · Corte Comigo</title>
+<link rel="icon" type="image/png" href="/CCPNG.png">
+<title>Barbearia Â· Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -16,7 +16,7 @@
 <header class="public-header">
   <div class="brand">Corte<span>Comigo</span></div>
   <nav class="public-nav">
-    <a href="/catalogo">← Voltar ao catálogo</a>
+    <a href="/catalogo">â† Voltar ao catÃ¡logo</a>
     <a href="/#planos">Planos</a>
     <span id="nav-auth" class="nav-auth-slot"></span>
   </nav>
@@ -25,7 +25,7 @@
 <main class="public-main">
   <a href="/catalogo" class="btn-back">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-    Voltar ao catálogo
+    Voltar ao catÃ¡logo
   </a>
   <h3 class="section-title">Galeria</h3>
   <div class="gallery-carousel">
@@ -43,7 +43,7 @@
 
   <div class="salon-header-info">
     <div>
-      <h1 id="salao-nome">Carregando…</h1>
+      <h1 id="salao-nome">Carregandoâ€¦</h1>
       <p id="salao-meta" style="color:var(--text-muted); margin-top:6px;"></p>
       <div class="tag-list" id="salao-tags" style="margin-top:12px;"></div>
     </div>
@@ -55,7 +55,7 @@
 
   <div style="display:flex; flex-wrap:wrap; gap:8px;">
     <button id="btn-compartilhar" type="button" class="btn btn-outline" style="padding:5px 14px; font-size:13px;">Compartilhar</button>
-    <button id="btn-favoritar" type="button" class="btn btn-outline" style="padding:5px 14px; font-size:13px;">☆ Favoritar</button>
+    <button id="btn-favoritar" type="button" class="btn btn-outline" style="padding:5px 14px; font-size:13px;">â˜† Favoritar</button>
     <button id="btn-denunciar" type="button" class="btn btn-outline" style="padding:5px 14px; font-size:13px; color:var(--danger, #e74c3c); border-color:var(--danger, #e74c3c);">Denunciar perfil</button>
   </div>
 
@@ -66,15 +66,15 @@
   <section class="reviews-box" id="reviews-box">
     <div class="reviews-head">
       <div>
-        <h3 class="reviews-title">Avaliações do salão</h3>
+        <h3 class="reviews-title">AvaliaÃ§Ãµes do salÃ£o</h3>
         <div class="reviews-summary">
-          <span class="reviews-stars" id="reviews-stars">☆☆☆☆☆</span>
-          <span class="reviews-nota" id="reviews-nota">—</span>
-          <span class="reviews-count" id="reviews-count">— comentários</span>
+          <span class="reviews-stars" id="reviews-stars">â˜†â˜†â˜†â˜†â˜†</span>
+          <span class="reviews-nota" id="reviews-nota">â€”</span>
+          <span class="reviews-count" id="reviews-count">â€” comentÃ¡rios</span>
         </div>
       </div>
       <button type="button" id="reviews-toggle" class="btn btn-brass" aria-expanded="false">
-        Ver avaliações e comentar
+        Ver avaliaÃ§Ãµes e comentar
       </button>
     </div>
     <div id="reviews-panel" class="reviews-panel" hidden>
@@ -83,7 +83,7 @@
     </div>
   </section>
 
-  <h3 class="section-title">Escolha um serviço</h3>
+  <h3 class="section-title">Escolha um serviÃ§o</h3>
 
   <div class="service-list-public" id="lista-servicos-publica"></div>
 
@@ -94,7 +94,7 @@
         <div class="stepper-track"></div>
         <div class="stepper-step active" data-step="1" aria-current="step">
           <span class="stepper-circle">1</span>
-          <span class="stepper-label">Serviço</span>
+          <span class="stepper-label">ServiÃ§o</span>
         </div>
         <div class="stepper-step" data-step="2">
           <span class="stepper-circle">2</span>
@@ -102,7 +102,7 @@
         </div>
         <div class="stepper-step" data-step="3">
           <span class="stepper-circle">3</span>
-          <span class="stepper-label">Horário</span>
+          <span class="stepper-label">HorÃ¡rio</span>
         </div>
         <div class="stepper-step" data-step="4">
           <span class="stepper-circle">4</span>
@@ -111,9 +111,9 @@
       </div>
 
       <form id="form-agendar-cliente" novalidate>
-        <!-- Step 1: Serviço (already chosen, just show summary) -->
+        <!-- Step 1: ServiÃ§o (already chosen, just show summary) -->
         <div class="booking-step active" data-step="1" role="step" aria-labelledby="step1-title">
-          <h4 id="step1-title" class="step-title">Serviço selecionado</h4>
+          <h4 id="step1-title" class="step-title">ServiÃ§o selecionado</h4>
           <div id="ag-resumo" class="service-summary-card"></div>
           <div class="step-actions">
             <button type="button" class="btn btn-outline btn-back-step" data-to="0">Voltar</button>
@@ -124,16 +124,16 @@
         <!-- Step 2: Calendar picker -->
         <div class="booking-step" data-step="2" role="step" aria-labelledby="step2-title" hidden>
           <h4 id="step2-title" class="step-title">Escolha a data</h4>
-          <p class="step-hint">Datas com horários livres nos próximos 30 dias</p>
+          <p class="step-hint">Datas com horÃ¡rios livres nos prÃ³ximos 30 dias</p>
           <div class="calendar-wrapper">
             <div class="calendar-header">
-              <button type="button" class="cal-nav" id="cal-prev" aria-label="Mês anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+              <button type="button" class="cal-nav" id="cal-prev" aria-label="MÃªs anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
               <div id="cal-month-year" class="cal-title"></div>
-              <button type="button" class="cal-nav" id="cal-next" aria-label="Próximo mês"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+              <button type="button" class="cal-nav" id="cal-next" aria-label="PrÃ³ximo mÃªs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
             </div>
-            <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="Calendário de disponibilidade"></div>
+            <div class="calendar-grid" id="calendar-grid" role="grid" aria-label="CalendÃ¡rio de disponibilidade"></div>
             <div class="calendar-legend">
-              <span class="cal-leg-item"><span class="cal-leg-dot available"></span> Disponível</span>
+              <span class="cal-leg-item"><span class="cal-leg-dot available"></span> DisponÃ­vel</span>
               <span class="cal-leg-item"><span class="cal-leg-dot selected"></span> Selecionado</span>
               <span class="cal-leg-item"><span class="cal-leg-dot past"></span> Passado</span>
               <span class="cal-leg-item"><span class="cal-leg-dot full"></span> Lotado</span>
@@ -147,13 +147,13 @@
 
         <!-- Step 3: Time slots grouped by period -->
         <div class="booking-step" data-step="3" role="step" aria-labelledby="step3-title" hidden>
-          <h4 id="step3-title" class="step-title">Escolha o horário</h4>
-          <p class="step-hint" id="step3-hint">Horários livres para <strong id="chosen-date-label"></strong></p>
+          <h4 id="step3-title" class="step-title">Escolha o horÃ¡rio</h4>
+          <p class="step-hint" id="step3-hint">HorÃ¡rios livres para <strong id="chosen-date-label"></strong></p>
           <div class="time-periods" id="time-periods"></div>
           <div class="custom-time-field" id="custom-time-field" hidden>
-            <label for="ac-horario-livre">Ou digite outro horário</label>
+            <label for="ac-horario-livre">Ou digite outro horÃ¡rio</label>
             <div class="custom-time-input">
-              <input type="time" id="ac-horario-livre" step="900" aria-label="Horário personalizado">
+              <input type="time" id="ac-horario-livre" step="900" aria-label="HorÃ¡rio personalizado">
               <span id="ac-horario-livre-status" class="custom-time-status"></span>
             </div>
           </div>
@@ -177,7 +177,7 @@
           </div>
           <p class="login-hint" id="login-hint" hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>Você será direcionado para login antes da confirmação final.</span>
+            <span>VocÃª serÃ¡ direcionado para login antes da confirmaÃ§Ã£o final.</span>
           </p>
           <div class="step-actions">
             <button type="button" class="btn btn-outline btn-back-step" data-to="3">Voltar</button>
@@ -192,28 +192,28 @@
     <div class="card" style="width:460px;">
       <h3 class="section-title" style="border-bottom-color:var(--danger, #e74c3c);">Denunciar perfil</h3>
       <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
-        Sua denúncia é enviada com sigilo para análise. Não compartilhamos seus dados com o perfil denunciado.
+        Sua denÃºncia Ã© enviada com sigilo para anÃ¡lise. NÃ£o compartilhamos seus dados com o perfil denunciado.
       </p>
       <form id="form-denunciar">
         <div class="field">
-          <label for="den-target">Quem você quer denunciar?</label>
+          <label for="den-target">Quem vocÃª quer denunciar?</label>
           <select id="den-target" name="target_type" required></select>
         </div>
         <div class="field">
           <label for="den-motivo">Qual o motivo?</label>
           <select id="den-motivo" name="reason" required>
             <option value="">Selecione um motivo...</option>
-            <option value="conteudo_inadequado">Conteúdo ou fotos inadequadas</option>
-            <option value="descricao_falsa">Descrição falsa</option>
-            <option value="precos_enganosos">Preços enganosos</option>
+            <option value="conteudo_inadequado">ConteÃºdo ou fotos inadequadas</option>
+            <option value="descricao_falsa">DescriÃ§Ã£o falsa</option>
+            <option value="precos_enganosos">PreÃ§os enganosos</option>
             <option value="comportamento_abusivo">Comportamento abusivo</option>
-            <option value="nao_comparecimento">Não comparecimento</option>
+            <option value="nao_comparecimento">NÃ£o comparecimento</option>
             <option value="spam">Spam</option>
-            <option value="outro">Outro / motivo não listado</option>
+            <option value="outro">Outro / motivo nÃ£o listado</option>
           </select>
         </div>
         <div class="field" id="den-campo-outro" style="display:none;">
-          <label for="den-outro-motivo">Conte o motivo da denúncia</label>
+          <label for="den-outro-motivo">Conte o motivo da denÃºncia</label>
           <input type="text" id="den-outro-motivo" name="reason_custom" maxlength="100"
             placeholder="Ex.: atendeu com atraso e foi grosseiro...">
         </div>
@@ -223,11 +223,11 @@
             placeholder="Descreva o que aconteceu..."></textarea>
         </div>
         <p id="den-aviso" style="color:var(--danger, #e74c3c); font-size:12.5px; display:none; margin-bottom:10px;">
-          Faça login para enviar uma denúncia.
+          FaÃ§a login para enviar uma denÃºncia.
         </p>
         <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
           <button type="button" class="btn btn-outline" id="btn-fechar-modal-denunciar">Cancelar</button>
-          <button type="submit" class="btn btn-brass">Enviar denúncia</button>
+          <button type="submit" class="btn btn-brass">Enviar denÃºncia</button>
         </div>
       </form>
     </div>
@@ -240,13 +240,14 @@
 <script src="js/chatbot.js"></script>
 <footer style="text-align:center;padding:16px 12px;margin-top:24px;border-top:1px solid var(--line);">
   <p style="font-size:11px;color:var(--text-muted);margin:0;">
-    <a href="/privacidade" style="color:var(--text-muted);text-decoration:none;">Política de Privacidade</a>
-    <span style="opacity:0.5;margin:0 6px;">·</span>
+    <a href="/privacidade" style="color:var(--text-muted);text-decoration:none;">PolÃ­tica de Privacidade</a>
+    <span style="opacity:0.5;margin:0 6px;">Â·</span>
     <a href="/termos" style="color:var(--text-muted);text-decoration:none;">Termos de Uso</a>
-    <span style="opacity:0.5;margin:0 6px;">·</span>
+    <span style="opacity:0.5;margin:0 6px;">Â·</span>
     <a href="/lgpd" style="color:var(--text-muted);text-decoration:none;">Seus Direitos (LGPD)</a>
   </p>
-  <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0;opacity:0.6;">© 2026 Corte Comigo — LGPD (Lei 13.709/2018)</p>
+  <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0;opacity:0.6;">Â© 2026 Corte Comigo â€” LGPD (Lei 13.709/2018)</p>
 </footer>
 </body>
 </html>
+

@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/jpeg" href="../public/assets/cortecomigologo.jpg">
-<title>Planos · Super Admin · Corte Comigo</title>
+<link rel="icon" type="image/png" href="/CCPNG.png">
+<title>Planos Â· Super Admin Â· Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -26,11 +26,11 @@
     </a>
     <a href="relatorios.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>Relatórios</span>
+      <span>RelatÃ³rios</span>
     </a>
     <a href="denuncias.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.8 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/></svg>
-      <span>Denúncias</span>
+      <span>DenÃºncias</span>
     </a>
     <a href="suporte-sa.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
@@ -55,13 +55,13 @@
 
 <main class="sa-main">
   <div class="sa-header">
-    <h1>Planos e preços</h1>
+    <h1>Planos e preÃ§os</h1>
     <button type="button" class="sa-btn-novo" id="btn-novo-plano">+ Novo plano</button>
   </div>
 
   <div class="sa-card">
-    <h2>Modo grátis do site</h2>
-    <p class="sa-hint">Quando ligado, TODAS as lojas usam o sistema completo (funções e relatórios) sem exigir assinatura. Os preços abaixo permanecem salvos.</p>
+    <h2>Modo grÃ¡tis do site</h2>
+    <p class="sa-hint">Quando ligado, TODAS as lojas usam o sistema completo (funÃ§Ãµes e relatÃ³rios) sem exigir assinatura. Os preÃ§os abaixo permanecem salvos.</p>
     <div class="sa-toggle-row">
       <label class="sa-switch">
         <input type="checkbox" id="tgl-site-gratis">
@@ -70,13 +70,13 @@
       <strong id="lbl-site-gratis">Desligado</strong>
     </div>
     <div class="sa-aviso" id="aviso-site-gratis" hidden>
-      Modo grátis ATIVO — nenhuma loja está sendo cobrada e todas têm acesso total.
+      Modo grÃ¡tis ATIVO â€” nenhuma loja estÃ¡ sendo cobrada e todas tÃªm acesso total.
     </div>
   </div>
 
   <div class="sa-card">
-    <h2>Preços dos planos</h2>
-    <p class="sa-hint">Edite rapidamente mensal, anual, por funcionário e o preço de comparação (exibido riscado no card Free). Use "Editar" para nome, limites, recursos e permissões.</p>
+    <h2>PreÃ§os dos planos</h2>
+    <p class="sa-hint">Edite rapidamente mensal, anual, por funcionÃ¡rio e o preÃ§o de comparaÃ§Ã£o (exibido riscado no card Free). Use "Editar" para nome, limites, recursos e permissÃµes.</p>
     <div style="margin-bottom:12px;">
       <button type="button" class="sa-btn-novo" id="btn-descobrir-planos" style="background:#b8863b; color:#0c0c0c;">Descobrir planos</button>
     </div>
@@ -87,10 +87,10 @@
             <th>Plano</th>
             <th>Mensal (R$)</th>
             <th>Anual (R$)</th>
-            <th>Por funcionário (R$)</th>
+            <th>Por funcionÃ¡rio (R$)</th>
             <th>De (R$)</th>
             <th>Limites</th>
-            <th>Ações</th>
+            <th>AÃ§Ãµes</th>
           </tr>
         </thead>
         <tbody id="tbody-planos">
@@ -101,8 +101,8 @@
   </div>
 
   <div class="sa-card">
-    <h2>10 dias grátis para novas contas</h2>
-    <p class="sa-hint">Quando ligado, novas contas podem iniciar a promoção de <strong>10 dias grátis</strong> ao escolher um plano (o teste vale uma única vez por loja). Quando desligado, a promoção deixa de existir: nenhuma assinatura nova entra em teste e as lojas assinam direto pelo PIX. Testes já em andamento seguem até o fim.</p>
+    <h2>10 dias grÃ¡tis para novas contas</h2>
+    <p class="sa-hint">Quando ligado, novas contas podem iniciar a promoÃ§Ã£o de <strong>10 dias grÃ¡tis</strong> ao escolher um plano (o teste vale uma Ãºnica vez por loja). Quando desligado, a promoÃ§Ã£o deixa de existir: nenhuma assinatura nova entra em teste e as lojas assinam direto pelo PIX. Testes jÃ¡ em andamento seguem atÃ© o fim.</p>
     <div class="sa-toggle-row">
       <label class="sa-switch">
         <input type="checkbox" id="tgl-trial">
@@ -111,7 +111,7 @@
       <strong id="lbl-trial">Ligado</strong>
     </div>
     <div class="sa-aviso" id="aviso-trial" hidden>
-      Promoção de 10 dias grátis DESATIVADA — novas contas assinam direto pelo PIX.
+      PromoÃ§Ã£o de 10 dias grÃ¡tis DESATIVADA â€” novas contas assinam direto pelo PIX.
     </div>
   </div>
 </main>
@@ -134,27 +134,27 @@
           <input type="number" id="f-price_annual" min="0" step="0.01" value="0">
         </div>
         <div class="sa-form-group">
-          <label for="f-price_per_employee">Por funcionário (R$)</label>
+          <label for="f-price_per_employee">Por funcionÃ¡rio (R$)</label>
           <input type="number" id="f-price_per_employee" min="0" step="0.01" value="0">
         </div>
         <div class="sa-form-group">
-          <label for="f-price_compare">Preço de comparação (R$)</label>
+          <label for="f-price_compare">PreÃ§o de comparaÃ§Ã£o (R$)</label>
           <input type="number" id="f-price_compare" min="0" step="0.01" value="0">
         </div>
         <div class="sa-form-group">
-          <label for="f-max_professionals">Máx. profissionais (vazio = ilimitado)</label>
+          <label for="f-max_professionals">MÃ¡x. profissionais (vazio = ilimitado)</label>
           <input type="number" id="f-max_professionals" min="1" step="1">
         </div>
         <div class="sa-form-group">
-          <label for="f-max_dependents">Máx. dependentes (vazio = ilimitado)</label>
+          <label for="f-max_dependents">MÃ¡x. dependentes (vazio = ilimitado)</label>
           <input type="number" id="f-max_dependents" min="0" step="1">
         </div>
         <div class="sa-form-group">
-          <label for="f-nivel_relatorio">Nível de relatório (vazio = nenhum)</label>
+          <label for="f-nivel_relatorio">NÃ­vel de relatÃ³rio (vazio = nenhum)</label>
           <select id="f-nivel_relatorio">
-            <option value="">— nenhum —</option>
-            <option value="basico">Básico</option>
-            <option value="intermediario">Intermediário</option>
+            <option value="">â€” nenhum â€”</option>
+            <option value="basico">BÃ¡sico</option>
+            <option value="intermediario">IntermediÃ¡rio</option>
             <option value="completo">Completo</option>
           </select>
         </div>
@@ -164,7 +164,7 @@
               <input type="checkbox" id="f-is_free">
               <span class="sa-slider" style="height:24px;"></span>
             </label>
-            <span>Plano grátis (is_free)</span>
+            <span>Plano grÃ¡tis (is_free)</span>
           </div>
           <div class="sa-switch-linha" style="margin-top:10px;">
             <label class="sa-switch" style="height:24px; width:44px;">
@@ -179,7 +179,7 @@
           <textarea id="f-features"></textarea>
         </div>
         <div class="sa-form-group full">
-          <label for="f-permissions">Permissões (uma por linha)</label>
+          <label for="f-permissions">PermissÃµes (uma por linha)</label>
           <textarea id="f-permissions"></textarea>
         </div>
       </div>
@@ -196,3 +196,4 @@
 <script src="js/planos-sa.js"></script>
 </body>
 </html>
+

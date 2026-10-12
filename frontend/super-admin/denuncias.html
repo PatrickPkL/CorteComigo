@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/jpeg" href="../public/assets/cortecomigologo.jpg">
-<title>Denúncias · Super Admin · Corte Comigo</title>
+<link rel="icon" type="image/png" href="/CCPNG.png">
+<title>DenÃºncias Â· Super Admin Â· Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -26,11 +26,11 @@
     </a>
     <a href="relatorios.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>Relatórios</span>
+      <span>RelatÃ³rios</span>
     </a>
     <a href="denuncias.html" class="active">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.8 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/></svg>
-      <span>Denúncias</span>
+      <span>DenÃºncias</span>
     </a>
     <a href="suporte-sa.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
@@ -55,7 +55,7 @@
 
 <main class="sa-main">
   <div class="sa-header">
-    <h1>Denúncias de Perfis</h1>
+    <h1>DenÃºncias de Perfis</h1>
     <div class="sa-header-extra">
       <div class="sa-count">Pendentes: <strong id="sa-total-pendentes">0</strong></div>
     </div>
@@ -71,7 +71,7 @@
 
   <div class="sa-filtros" id="sa-filtros-tipo">
     <button class="sa-filtro-btn active" data-tipo="todos">Todos os tipos</button>
-    <button class="sa-filtro-btn" data-tipo="salao">Salão</button>
+    <button class="sa-filtro-btn" data-tipo="salao">SalÃ£o</button>
     <button class="sa-filtro-btn" data-tipo="barbeiro">Barbeiro</button>
     <button class="sa-filtro-btn" data-tipo="cliente">Cliente</button>
   </div>
@@ -86,7 +86,7 @@
           <th>Motivo</th>
           <th>Detalhes</th>
           <th>Status</th>
-          <th>Ações</th>
+          <th>AÃ§Ãµes</th>
         </tr>
       </thead>
       <tbody id="tbody-denuncias">
@@ -99,14 +99,14 @@
 <!-- modal -->
 <div class="sa-modal" id="sa-modal">
   <div class="sa-modal-box">
-    <h3 id="sa-modal-titulo">Revisar Denúncia</h3>
+    <h3 id="sa-modal-titulo">Revisar DenÃºncia</h3>
     <div class="sa-modal-meta" id="sa-modal-meta"></div>
     <div class="sa-modal-block">
       <div class="lbl">Alvo denunciado</div>
       <div class="txt" id="sa-modal-alvo"></div>
     </div>
     <div class="sa-modal-block">
-      <div class="lbl">Detalhes da denúncia</div>
+      <div class="lbl">Detalhes da denÃºncia</div>
       <div class="txt" id="sa-modal-detalhes"></div>
     </div>
     <input type="hidden" id="sa-modal-id">
@@ -120,8 +120,8 @@
       </select>
     </div>
     <div class="sa-modal-field">
-      <div class="lbl">Anotação de moderação (opcional)</div>
-      <textarea id="sa-modal-nota" placeholder="Registre a decisão tomada..."></textarea>
+      <div class="lbl">AnotaÃ§Ã£o de moderaÃ§Ã£o (opcional)</div>
+      <textarea id="sa-modal-nota" placeholder="Registre a decisÃ£o tomada..."></textarea>
     </div>
     <div class="sa-modal-actions">
       <button class="sa-btn sa-btn-ghost" id="sa-modal-cancel">Cancelar</button>
