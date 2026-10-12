@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <base href="/admin/">
-<link rel="icon" type="image/png" href="/CCPNG.png">
-<title>Entrar Â· Corte Comigo</title>
+<link rel="icon" type="image/jpeg" href="../public/assets/cortecomigologo.jpg">
+<title>Entrar · Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -15,13 +15,13 @@
 <body data-page="login">
 <a href="/catalogo" class="btn-back">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-  Voltar ao catÃ¡logo
+  Voltar ao catálogo
 </a>
 <div class="login-shell">
 
   <div class="login-visual">
     <h1>Sua barbearia, no ritmo certo.</h1>
-    <p>Agende, acompanhe e organize seus clientes em um sÃ³ lugar â€” feito para o dia a dia de quem corta, apara e cuida.</p>
+    <p>Agende, acompanhe e organize seus clientes em um só lugar — feito para o dia a dia de quem corta, apara e cuida.</p>
   </div>
 
   <div class="login-form-side">
@@ -30,12 +30,12 @@
 
       <div class="role-selector">
         <button type="button" class="role-btn active" data-role="cliente">Cliente</button>
-        <button type="button" class="role-btn" data-role="dono">SalÃ£o / Barbearia</button>
-        <button type="button" class="role-btn" data-role="dependente">FuncionÃ¡rio / Dependente</button>
+        <button type="button" class="role-btn" data-role="dono">Salão / Barbearia</button>
+        <button type="button" class="role-btn" data-role="dependente">Funcionário / Dependente</button>
       </div>
 
       <div class="demo-hint" id="demo-hint-login">
-        <strong>OlÃ¡:</strong> informe seu e-mail e receba um cÃ³digo de verificaÃ§Ã£o na sua caixa de entrada.
+        <strong>Olá:</strong> informe seu e-mail e receba um código de verificação na sua caixa de entrada.
       </div>
 
       <!-- CLIENTE -->
@@ -89,18 +89,18 @@
               </button>
             </div>
             <div id="cli-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
-            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiÃºscula, 1 minÃºscula, 1 nÃºmero, 1 especial (* @ # $ %)</small>
+            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
           </div>
           <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
             <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">
-            Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">PolÃ­tica de Privacidade</a>
+            Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">Política de Privacidade</a>
             e os <a href="/termos" target="_blank" style="color:#f5c518;">Termos de Uso</a>.
           </label>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta</button>
         </form>
       </div>
 
-      <!-- SALÃƒO / BARBEARIA -->
+      <!-- SALÃO / BARBEARIA -->
       <div id="painel-dono" style="display:none;">
         <div class="login-tabs">
           <div class="login-tab active" id="tab-dono-entrar">Entrar</div>
@@ -110,7 +110,7 @@
         <form id="form-dono-login">
           <div class="field">
             <label for="dono-tel">Telefone ou e-mail</label>
-            <input type="text" id="dono-tel" placeholder="(71) 99999-0000 Â· voce@email.com" required>
+            <input type="text" id="dono-tel" placeholder="(71) 99999-0000 · voce@email.com" required>
           </div>
           <div class="field">
             <label for="dono-senha-login">Senha</label>
@@ -131,11 +131,11 @@
         <form id="form-dono-cadastro" style="display:none;">
           <div class="field">
             <label for="cad-nome-resp">Seu nome</label>
-            <input type="text" id="cad-nome-resp" placeholder="Nome do responsÃ¡vel" required>
+            <input type="text" id="cad-nome-resp" placeholder="Nome do responsável" required>
           </div>
           <div class="field">
-            <label for="cad-salao-nome">Nome do salÃ£o</label>
-            <input type="text" id="cad-salao-nome" placeholder="Ex: Barbearia SÃ£o Jorge" required>
+            <label for="cad-salao-nome">Nome do salão</label>
+            <input type="text" id="cad-salao-nome" placeholder="Ex: Barbearia São Jorge" required>
           </div>
           <div class="field">
             <label for="cad-email">E-mail</label>
@@ -155,18 +155,18 @@
               </button>
             </div>
             <div id="cad-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
-            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiÃºscula, 1 minÃºscula, 1 nÃºmero, 1 especial (* @ # $ %)</small>
+            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
           </div>
           <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
             <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">
-            Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">PolÃ­tica de Privacidade</a>
+            Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">Política de Privacidade</a>
             e os <a href="/termos" target="_blank" style="color:#f5c518;">Termos de Uso</a>.
           </label>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta do salÃ£o</button>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta do salão</button>
         </form>
       </div>
 
-      <!-- FUNCIONÃRIO / DEPENDENTE -->
+      <!-- FUNCIONÁRIO / DEPENDENTE -->
       <div id="painel-depend" style="display:none;">
         <div class="login-tabs">
           <div class="login-tab active" id="tab-dep-entrar">Entrar</div>
@@ -175,9 +175,9 @@
 
         <form id="form-dep-login">
           <p style="color:var(--text-muted); font-size:13.5px; margin:0 0 14px 0;">
-            Use seu <strong>login e senha</strong>. Se a sua conta ainda nÃ£o foi
-            vinculada, o <strong>CÃ³digo Ãšnico</strong> da empresa Ã© opcional nesta
-            etapa â€” vocÃª informa ele em seguida.</p>
+            Use seu <strong>login e senha</strong>. Se a sua conta ainda não foi
+            vinculada, o <strong>Código Único</strong> da empresa é opcional nesta
+            etapa — você informa ele em seguida.</p>
           <div class="field">
             <label for="dep-login">Login (e-mail)</label>
             <input type="email" id="dep-login" placeholder="funcionario@empresa.com.br" required autocomplete="username">
@@ -185,7 +185,7 @@
           <div class="field">
             <label for="dep-senha">Senha</label>
             <div class="password-wrapper">
-              <input type="password" id="dep-senha" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required autocomplete="current-password">
+              <input type="password" id="dep-senha" placeholder="••••••••" required autocomplete="current-password">
               <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
                 <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -193,7 +193,7 @@
             </div>
           </div>
           <div class="field">
-            <label for="dep-codigo">CÃ³digo Ãšnico da empresa <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
+            <label for="dep-codigo">Código Único da empresa <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
             <input type="text" id="dep-codigo" placeholder="Ex: 7KXQ9M2A"
                    style="text-transform:uppercase; font-family:monospace; letter-spacing:2px;">
           </div>
@@ -205,8 +205,8 @@
 
         <form id="form-dep-cadastro" style="display:none;">
           <p style="color:var(--text-muted); font-size:13.5px; margin:0 0 14px 0;">
-            Crie sua conta de funcionÃ¡rio. Depois de entrar, vocÃª vincula sua conta
-            ao salÃ£o informando o <strong>CÃ³digo Ãšnico</strong> da empresa.</p>
+            Crie sua conta de funcionário. Depois de entrar, você vincula sua conta
+            ao salão informando o <strong>Código Único</strong> da empresa.</p>
           <div class="field">
             <label for="dep-cad-nome">Nome completo</label>
             <input type="text" id="dep-cad-nome" placeholder="Seu nome" required>
@@ -218,14 +218,14 @@
           <div class="field">
             <label for="dep-cad-senha">Senha</label>
             <div class="password-wrapper">
-              <input type="password" id="dep-cad-senha" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢ (mÃ­n. 8 caracteres)" minlength="8" maxlength="12" required autocomplete="new-password">
+              <input type="password" id="dep-cad-senha" placeholder="•••••••• (mín. 8 caracteres)" minlength="8" maxlength="12" required autocomplete="new-password">
               <button type="button" class="password-toggle" aria-label="Mostrar/ocultar senha" tabindex="-1">
                 <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;display:none;"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
               </button>
             </div>
             <div id="dep-cad-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
-            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiÃºscula, 1 minÃºscula, 1 nÃºmero, 1 especial (* @ # $ %)</small>
+            <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
           </div>
           <div class="field">
             <label for="dep-cad-tel">Telefone (com DDD) <span style="opacity:.5;font-size:.85em">(opcional)</span></label>
@@ -233,27 +233,27 @@
           </div>
           <label class="checkbox-lgpd" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#aaa;margin:12px 0 4px;cursor:pointer;">
             <input type="checkbox" name="aceite_privacidade" required style="margin-top:3px;accent-color:#f5c518;">
-            Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">PolÃ­tica de Privacidade</a>
+            Li e aceito a <a href="/privacidade" target="_blank" style="color:#f5c518;">Política de Privacidade</a>
             e os <a href="/termos" target="_blank" style="color:#f5c518;">Termos de Uso</a>.
           </label>
-          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta de funcionÃ¡rio</button>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">Criar conta de funcionário</button>
         </form>
       </div>
 
-      <!-- CÃ“DIGO DE VERIFICAÃ‡ÃƒO (compartilhado entre os papÃ©is) -->
+      <!-- CÓDIGO DE VERIFICAÇÃO (compartilhado entre os papéis) -->
       <div id="etapa-codigo" style="display:none;">
         <div class="demo-hint" id="banner-codigo" hidden></div>
-        <h3 class="section-title" style="margin-bottom:12px;">CÃ³digo de verificaÃ§Ã£o</h3>
+        <h3 class="section-title" style="margin-bottom:12px;">Código de verificação</h3>
         <p id="codigo-info" style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;"></p>
         <form id="form-verificar-codigo">
           <div class="field">
-            <label for="input-codigo">CÃ³digo de 6 dÃ­gitos</label>
+            <label for="input-codigo">Código de 6 dígitos</label>
             <input type="text" id="input-codigo" maxlength="6" inputmode="numeric"
                    placeholder="000000" required autocomplete="one-time-code"
                    style="text-align:center; font-size:20px; letter-spacing:8px;">
           </div>
-          <!-- passo extra sÃ³ na RECUPERAÃ‡ÃƒO: define a nova senha no mesmo envio.
-               Oculto por padrÃ£o; login.js mostra quando o fluxo Ã© 'recuperacao'. -->
+          <!-- passo extra só na RECUPERAÇÃO: define a nova senha no mesmo envio.
+               Oculto por padrão; login.js mostra quando o fluxo é 'recuperacao'. -->
           <div id="campos-nova-senha" style="display:none;">
             <div class="field">
               <label for="rec-nova-senha">Nova senha</label>
@@ -265,7 +265,7 @@
                 </button>
               </div>
               <div id="rec-senha-forca" class="senha-forca" style="margin-top:6px;"></div>
-              <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiÃºscula, 1 minÃºscula, 1 nÃºmero, 1 especial (* @ # $ %)</small>
+              <small style="color:var(--text-muted); font-size:12px;">8 a 12 caracteres: 1 maiúscula, 1 minúscula, 1 número, 1 especial (* @ # $ %)</small>
             </div>
             <div class="field">
               <label for="rec-confirmar-senha">Confirmar nova senha</label>
@@ -280,24 +280,24 @@
           </div>
           <button type="submit" class="btn btn-primary" id="btn-verificar-codigo" style="width:100%; justify-content:center;">Verificar e entrar</button>
           <p style="text-align:center; margin-top:14px; font-size:13.5px;">
-            <a href="#" id="btn-reenviar" style="color:var(--brass);">Reenviar cÃ³digo</a> Â·
+            <a href="#" id="btn-reenviar" style="color:var(--brass);">Reenviar código</a> ·
             <a href="#" id="btn-voltar-login" style="color:var(--brass);">Voltar</a>
           </p>
         </form>
       </div>
 
-      <!-- RECUPERAÃ‡ÃƒO DE ACESSO POR E-MAIL -->
+      <!-- RECUPERAÇÃO DE ACESSO POR E-MAIL -->
       <div id="etapa-recuperar" style="display:none;">
         <h3 class="section-title" style="margin-bottom:12px;">Recuperar acesso</h3>
         <p style="color:var(--text-muted); font-size:13.5px; margin-bottom:14px;">
-          Informe o e-mail cadastrado. Enviaremos um cÃ³digo de 6 dÃ­gitos para vocÃª criar uma nova senha e entrar na conta.</p>
+          Informe o e-mail cadastrado. Enviaremos um código de 6 dígitos para você criar uma nova senha e entrar na conta.</p>
         <form id="form-recuperar">
           <div class="field">
             <label for="input-rec-email">E-mail cadastrado</label>
             <input type="email" id="input-rec-email" placeholder="voce@email.com" required autocomplete="email">
           </div>
           <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
-            Enviar cÃ³digo</button>
+            Enviar código</button>
           <p style="text-align:center; margin-top:14px; font-size:13.5px;">
             Voltou? <a href="#" id="btn-voltar-recuperar" style="color:var(--brass);">Voltar ao login</a>
           </p>
@@ -313,26 +313,25 @@
 <script src="js/login.js"></script>
 <footer style="text-align:center;padding:16px 12px;margin-top:24px;border-top:1px solid var(--line);">
   <p style="font-size:11px;color:var(--text-muted);margin:0;">
-    <a href="/privacidade" style="color:var(--text-muted);text-decoration:none;">PolÃ­tica de Privacidade</a>
-    <span style="opacity:0.5;margin:0 6px;">Â·</span>
+    <a href="/privacidade" style="color:var(--text-muted);text-decoration:none;">Política de Privacidade</a>
+    <span style="opacity:0.5;margin:0 6px;">·</span>
     <a href="/termos" style="color:var(--text-muted);text-decoration:none;">Termos de Uso</a>
-    <span style="opacity:0.5;margin:0 6px;">Â·</span>
+    <span style="opacity:0.5;margin:0 6px;">·</span>
     <a href="/lgpd" style="color:var(--text-muted);text-decoration:none;">Seus Direitos (LGPD)</a>
   </p>
-  <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0;opacity:0.6;">Â© 2026 Corte Comigo â€” LGPD (Lei 13.709/2018)</p>
-  <p id="cc-build" style="font-size:10px;color:var(--text-muted);margin:4px 0 0;opacity:0.45;font-family:monospace;">build â€”</p>
+  <p style="font-size:10px;color:var(--text-muted);margin:6px 0 0;opacity:0.6;">© 2026 Corte Comigo — LGPD (Lei 13.709/2018)</p>
+  <p id="cc-build" style="font-size:10px;color:var(--text-muted);margin:4px 0 0;opacity:0.45;font-family:monospace;">build —</p>
 </footer>
 <script>
-/* SÃ³ para diagnÃ³stico: mostra qual build estÃ¡ no ar. */
+/* Só para diagnóstico: mostra qual build está no ar. */
 fetch('/api/versao', { cache: 'no-store' })
   .then(r => r.ok ? r.json() : null)
   .then(v => {
     if (!v || !v.versao) return;
     const el = document.getElementById('cc-build');
-    if (el) el.textContent = 'build ' + v.versao + (v.deploy ? ' Â· deploy ' + String(v.deploy).slice(0, 16).replace('T', ' ') : '');
+    if (el) el.textContent = 'build ' + v.versao + (v.deploy ? ' · deploy ' + String(v.deploy).slice(0, 16).replace('T', ' ') : '');
   })
   .catch(() => {});
 </script>
 </body>
 </html>
-

@@ -1,10 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/png" href="/CCPNG.png">
-<title>RelatÃ³rios Â· Super Admin Â· Corte Comigo</title>
+<link rel="icon" type="image/jpeg" href="../public/assets/cortecomigologo.jpg">
+<title>Relatórios · Super Admin · Corte Comigo</title>
 <script src="../shared/js/tema-inicio.js"></script>
 <link rel="stylesheet" href="../shared/css/base.css">
 <link rel="stylesheet" href="../shared/css/components.css">
@@ -26,11 +26,11 @@
     </a>
     <a href="relatorios.html" class="active">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      <span>RelatÃ³rios</span>
+      <span>Relatórios</span>
     </a>
     <a href="denuncias.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 4.8 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/></svg>
-      <span>DenÃºncias</span>
+      <span>Denúncias</span>
     </a>
     <a href="suporte-sa.html">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
@@ -55,11 +55,11 @@
 
 <main class="sa-main">
   <div class="sa-header">
-    <h1>RelatÃ³rios</h1>
+    <h1>Relatórios</h1>
     <div class="sa-periodo">
       <select id="sa-periodo">
-        <option value="d30">Ãšltimos 30 dias</option>
-        <option value="d90">Ãšltimos 90 dias</option>
+        <option value="d30">Últimos 30 dias</option>
+        <option value="d90">Últimos 90 dias</option>
         <option value="d365">12 meses</option>
       </select>
     </div>
@@ -67,20 +67,20 @@
 
   <div class="sa-stats-grid">
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Receita no PerÃ­odo</div>
-      <div class="sa-stat-value" id="stat-receita">â€”</div>
+      <div class="sa-stat-label">Receita no Período</div>
+      <div class="sa-stat-value" id="stat-receita">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Novas Lojas no PerÃ­odo</div>
-      <div class="sa-stat-value" id="stat-lojas">â€”</div>
+      <div class="sa-stat-label">Novas Lojas no Período</div>
+      <div class="sa-stat-value" id="stat-lojas">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Novos UsuÃ¡rios no PerÃ­odo</div>
-      <div class="sa-stat-value" id="stat-usuarios">â€”</div>
+      <div class="sa-stat-label">Novos Usuários no Período</div>
+      <div class="sa-stat-value" id="stat-usuarios">—</div>
     </div>
     <div class="sa-stat-card">
-      <div class="sa-stat-label">Agendamentos no PerÃ­odo</div>
-      <div class="sa-stat-value" id="stat-agendamentos">â€”</div>
+      <div class="sa-stat-label">Agendamentos no Período</div>
+      <div class="sa-stat-value" id="stat-agendamentos">—</div>
     </div>
   </div>
 
@@ -92,7 +92,7 @@
         <thead>
           <tr>
             <th>Plano</th>
-            <th>PreÃ§o/MÃªs</th>
+            <th>Preço/Mês</th>
             <th>Total</th>
             <th>Ativas</th>
             <th>Trial</th>
@@ -145,4 +145,3 @@
 <script src="js/relatorios.js"></script>
 </body>
 </html>
-
