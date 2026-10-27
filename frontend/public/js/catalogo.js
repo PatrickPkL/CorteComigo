@@ -99,8 +99,29 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    function norm(s){
+      return String(s || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9 ]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    const teste = ['barbearia sao jorge', 'studio nova era', 'barbearia do ze', 'espaco bela vista', 'barber class', 'trato fino barbearia', 'barbearia vila nova'];
+    function _norm(s){
+      return String(s||'')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/\?/g,'')
+        .toLowerCase()
+        .replace(/[^a-z0-9 ]+/g,' ')
+        .replace(/\s+/g,' ')
+        .trim();
+    }
+    var _teste = ['barbearia sao jorge','studio nova era','barbearia do ze','espaco bela vista','barber class','trato fino','barbearia vila nova'];
     const items = (res.items || []).filter(function(item){
-      return item.type !== 'shop';
+      if(item.type !== 'shop') return true;
+      var n = _norm(item.name);
+      for(var i=0;i<_teste.length;i++){ if(n.indexOf(_teste[i])!==-1) return false; }
+      return true;
     });
 
     grid.innerHTML = items.map(cardLoja).join('');
@@ -204,8 +225,29 @@ document.addEventListener('DOMContentLoaded', () => {
           lng: pos.coords.longitude,
           raio: 30
         });
+        function norm(s){
+          return String(s || '').toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9 ]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        }
+        const teste = ['barbearia sao jorge', 'studio nova era', 'barbearia do ze', 'espaco bela vista', 'barber class', 'trato fino barbearia', 'barbearia vila nova'];
+        function _norm(s){
+          return String(s||'')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+            .replace(/\?/g,'')
+            .toLowerCase()
+            .replace(/[^a-z0-9 ]+/g,' ')
+            .replace(/\s+/g,' ')
+            .trim();
+        }
+        var _teste = ['barbearia sao jorge','studio nova era','barbearia do ze','espaco bela vista','barber class','trato fino','barbearia vila nova'];
         const items = (res.items || []).filter(function(item){
-          return item.type !== 'shop';
+          if(item.type !== 'shop') return true;
+          var n = _norm(item.name);
+          for(var i=0;i<_teste.length;i++){ if(n.indexOf(_teste[i])!==-1) return false; }
+          return true;
         });
         grid.innerHTML = items.map(cardLoja).join('');
         if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
