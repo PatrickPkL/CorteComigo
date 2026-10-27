@@ -99,10 +99,16 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    grid.innerHTML = '';
-    if (estadoVazio) estadoVazio.style.display = '';
-    if (pagination) pagination.innerHTML = '';
-    return;
+    const TESTE = ['Barbearia São Jorge', 'Studio Nova Era', 'Barbearia do Zé', 'Espaço Bela Vista', 'Barber Class', 'Trato Fino Barbearia'];
+    const items = (res.items || []).filter(function(item){
+      if (item.type === 'shop' && TESTE.indexOf(item.name) !== -1) return false;
+      return true;
+    });
+
+    grid.innerHTML = items.map(cardLoja).join('');
+    if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
+
+    renderPagination(res.total);
   }
 
   function renderPagination(total) {
@@ -200,9 +206,14 @@ document.addEventListener('DOMContentLoaded', () => {
           lng: pos.coords.longitude,
           raio: 30
         });
-        grid.innerHTML = '';
-        if (estadoVazio) estadoVazio.style.display = '';
-        if (pagination) pagination.innerHTML = '';
+        const TESTE = ['Barbearia São Jorge', 'Studio Nova Era', 'Barbearia do Zé', 'Espaço Bela Vista', 'Barber Class', 'Trato Fino Barbearia'];
+        const items = (res.items || []).filter(function(item){
+          if (item.type === 'shop' && TESTE.indexOf(item.name) !== -1) return false;
+          return true;
+        });
+        grid.innerHTML = items.map(cardLoja).join('');
+        if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
+        showToast(items.length + ' barbearia(s) encontrada(s) perto de você!');
       } catch (e) {
         showToast(msgErro(e), 'error');
       }
