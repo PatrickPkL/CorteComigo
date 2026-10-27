@@ -99,10 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const TESTE = ['Barbearia São Jorge', 'Studio Nova Era', 'Barbearia do Zé', 'Espaço Bela Vista', 'Barber Class', 'Trato Fino Barbearia'];
     const items = (res.items || []).filter(function(item){
-      if (item.type === 'shop' && TESTE.indexOf(item.name) !== -1) return false;
-      return true;
+      return item.type !== 'shop';
     });
 
     grid.innerHTML = items.map(cardLoja).join('');
@@ -206,10 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
           lng: pos.coords.longitude,
           raio: 30
         });
-        const TESTE = ['Barbearia São Jorge', 'Studio Nova Era', 'Barbearia do Zé', 'Espaço Bela Vista', 'Barber Class', 'Trato Fino Barbearia'];
         const items = (res.items || []).filter(function(item){
-          if (item.type === 'shop' && TESTE.indexOf(item.name) !== -1) return false;
-          return true;
+          return item.type !== 'shop';
         });
         grid.innerHTML = items.map(cardLoja).join('');
         if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
