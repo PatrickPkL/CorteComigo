@@ -107,9 +107,26 @@ document.addEventListener('DOMContentLoaded', () => {
         .trim();
     }
     const teste = ['barbearia sao jorge', 'studio nova era', 'barbearia do ze', 'espaco bela vista', 'barber class', 'trato fino barbearia', 'barbearia vila nova'];
+    var _IGNORAR = {
+      'cc10da1e-afde-4b7e-9d9e-0f5b0c58b150': true,
+      'be9c5481-53ba-43ac-967c-57c075dd33fa': true,
+      'c0b99035-bba8-48af-b615-69e945eb3418': true,
+      '17826b9c-6c36-4245-8980-298823e494f8': true,
+      'aca3e8e7-a20d-4106-a317-82c83ed8a5e4': true,
+      '67f0264c-99fa-44f6-b97d-6301b35d2e91': true,
+      '18dd3608-b8bd-456c-897c-c44da0f8d014': true,
+      'c4489647-b5e6-45e9-8b81-083bd62eafa0': true,
+      'b60842e8-3a31-493c-8738-0656831af952': true
+    };
     const items = (res.items || []).filter(function(item){
-      return item.type !== 'shop';
+      if (item.type === 'shop' && _IGNORAR[item.id]) return false;
+      return true;
     });
+
+    grid.innerHTML = items.map(cardLoja).join('');
+    if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
+
+    renderPagination(res.total);
 
     grid.innerHTML = items.map(cardLoja).join('');
     if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
@@ -220,8 +237,20 @@ document.addEventListener('DOMContentLoaded', () => {
             .trim();
         }
         const teste = ['barbearia sao jorge', 'studio nova era', 'barbearia do ze', 'espaco bela vista', 'barber class', 'trato fino barbearia', 'barbearia vila nova'];
+        var _IGNORAR = {
+          'cc10da1e-afde-4b7e-9d9e-0f5b0c58b150': true,
+          'be9c5481-53ba-43ac-967c-57c075dd33fa': true,
+          'c0b99035-bba8-48af-b615-69e945eb3418': true,
+          '17826b9c-6c36-4245-8980-298823e494f8': true,
+          'aca3e8e7-a20d-4106-a317-82c83ed8a5e4': true,
+          '67f0264c-99fa-44f6-b97d-6301b35d2e91': true,
+          '18dd3608-b8bd-456c-897c-c44da0f8d014': true,
+          'c4489647-b5e6-45e9-8b81-083bd62eafa0': true,
+          'b60842e8-3a31-493c-8738-0656831af952': true
+        };
         const items = (res.items || []).filter(function(item){
-          return item.type !== 'shop';
+          if (item.type === 'shop' && _IGNORAR[item.id]) return false;
+          return true;
         });
         grid.innerHTML = items.map(cardLoja).join('');
         if (estadoVazio) estadoVazio.style.display = items.length ? 'none' : '';
