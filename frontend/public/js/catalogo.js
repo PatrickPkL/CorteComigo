@@ -99,10 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    grid.innerHTML = res.items.map(cardLoja).join('');
-    if (estadoVazio) estadoVazio.style.display = res.items.length ? 'none' : '';
-
-    renderPagination(res.total);
+    grid.innerHTML = '';
+    if (estadoVazio) estadoVazio.style.display = '';
+    if (pagination) pagination.innerHTML = '';
+    return;
   }
 
   function renderPagination(total) {
@@ -200,9 +200,9 @@ document.addEventListener('DOMContentLoaded', () => {
           lng: pos.coords.longitude,
           raio: 30
         });
-        grid.innerHTML = res.items.map(cardLoja).join('');
-        if (estadoVazio) estadoVazio.style.display = res.items.length ? 'none' : '';
-        showToast(res.items.length + ' barbearia(s) encontrada(s) perto de você!');
+        grid.innerHTML = '';
+        if (estadoVazio) estadoVazio.style.display = '';
+        if (pagination) pagination.innerHTML = '';
       } catch (e) {
         showToast(msgErro(e), 'error');
       }
